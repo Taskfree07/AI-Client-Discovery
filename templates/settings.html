@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Client Discovery - Settings</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <div class="logo-icon">🎯</div>
+                <span>Client Discovery</span>
+            </div>
+
+            <nav>
+                <ul class="nav-menu">
+                    <li class="nav-item">
+                        <a href="/" class="nav-link">
+                            <span class="nav-icon">📊</span>
+                            <span>Dashboard</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/pipeline" class="nav-link">
+                            <span class="nav-icon">🔄</span>
+                            <span>Pipeline</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/leads" class="nav-link">
+                            <span class="nav-icon">👥</span>
+                            <span>All Leads</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/emails" class="nav-link">
+                            <span class="nav-icon">✉️</span>
+                            <span>Email Queue</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/settings" class="nav-link active">
+                            <span class="nav-icon">⚙️</span>
+                            <span>Settings</span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="page-header">
+                <h1 class="page-title">⚙️ Settings</h1>
+                <p class="page-subtitle">Configure your API keys and application settings</p>
+            </div>
+
+            <form id="settingsForm" onsubmit="handleSaveSettings(event)">
+                <div class="settings-grid">
+                    <!-- Google Custom Search Settings -->
+                    <div class="settings-section">
+                        <h2 class="settings-section-title">🔍 Google Custom Search API</h2>
+                        <p class="settings-section-description">
+                            Configure Google Custom Search to find job openings across the web.
+                        </p>
+
+                        <div class="form-group">
+                            <label class="form-label" for="google_api_key">API Key</label>
+                            <input type="text" id="google_api_key" name="google_api_key"
+                                   class="form-input" placeholder="Paste your Google API key here">
+                            <div class="form-hint">
+                                Get your API key from <a href="https://console.cloud.google.com" target="_blank">Google Cloud Console</a>.
+                                <strong>If you see ***, replace it with your actual API key.</strong>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="google_cx_code">Custom Search Engine ID (CX)</label>
+                            <input type="text" id="google_cx_code" name="google_cx_code"
+                                   class="form-input" placeholder="e.g., 76b918ebfb2c247ee">
+                            <div class="form-hint">
+                                Create a custom search engine at <a href="https://cse.google.com" target="_blank">Google CSE</a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Apollo API Settings -->
+                    <div class="settings-section">
+                        <h2 class="settings-section-title">👥 Apollo API</h2>
+                        <p class="settings-section-description">
+                            Configure Apollo API to find company information and contact details.
+                        </p>
+
+                        <div class="form-group">
+                            <label class="form-label" for="apollo_api_key">API Key</label>
+                            <input type="text" id="apollo_api_key" name="apollo_api_key"
+                                   class="form-input" placeholder="Paste your Apollo API key here">
+                            <div class="form-hint">
+                                Get your API key from <a href="https://apollo.io" target="_blank">Apollo.io</a> dashboard.
+                                <strong>If you see ***, replace it with your actual API key.</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Microsoft Email Settings -->
+                    <div class="settings-section">
+                        <h2 class="settings-section-title">✉️ Microsoft Email (Entra ID)</h2>
+                        <p class="settings-section-description">
+                            Configure Microsoft Entra ID (Azure AD) for sending emails via Microsoft Graph API.
+                        </p>
+
+                        <div class="form-group">
+                            <label class="form-label" for="azure_client_id">Client ID</label>
+                            <input type="text" id="azure_client_id" name="azure_client_id"
+                                   class="form-input" placeholder="Enter Azure Client ID">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="azure_client_secret">Client Secret</label>
+                            <input type="text" id="azure_client_secret" name="azure_client_secret"
+                                   class="form-input" placeholder="Paste Azure Client Secret here">
+                            <div class="form-hint">
+                                <strong>If you see ***, replace it with your actual client secret.</strong>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="azure_tenant_id">Tenant ID</label>
+                            <input type="text" id="azure_tenant_id" name="azure_tenant_id"
+                                   class="form-input" placeholder="Enter Azure Tenant ID">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="sender_email">Sender Email Address</label>
+                            <input type="email" id="sender_email" name="sender_email"
+                                   class="form-input" placeholder="your-email@company.com">
+                            <div class="form-hint">
+                                The email address that will send recruitment emails (must be authorized in Azure AD)
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <button type="button" class="btn btn-secondary" onclick="testEmailConfig()">
+                                🧪 Test Email Configuration
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Google Sheets Settings -->
+                    <div class="settings-section">
+                        <h2 class="settings-section-title">📊 Google Sheets Integration</h2>
+                        <p class="settings-section-description">
+                            Configure Google Sheets to log all campaign results and leads.
+                        </p>
+
+                        <div class="form-group">
+                            <label class="form-label" for="google_spreadsheet_id">Spreadsheet ID</label>
+                            <input type="text" id="google_spreadsheet_id" name="google_spreadsheet_id"
+                                   class="form-input" placeholder="Enter your Google Spreadsheet ID">
+                            <div class="form-hint">
+                                The Spreadsheet ID from the URL: docs.google.com/spreadsheets/d/<strong>SPREADSHEET_ID</strong>/edit
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <div class="alert alert-info">
+                                <span>ℹ️</span>
+                                <span>
+                                    You'll need to authenticate with Google Sheets when running your first campaign.
+                                    A credentials file will be downloaded automatically.
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Default Campaign Settings -->
+                    <div class="settings-section">
+                        <h2 class="settings-section-title">⚙️ Default Campaign Settings</h2>
+                        <p class="settings-section-description">
+                            Set default values for new campaigns.
+                        </p>
+
+                        <div class="form-group">
+                            <label class="form-label" for="default_company_size_min">
+                                Default Min Company Size (employees)
+                            </label>
+                            <input type="number" id="default_company_size_min" name="default_company_size_min"
+                                   class="form-input" value="50" min="1">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="default_company_size_max">
+                                Default Max Company Size (employees)
+                            </label>
+                            <input type="number" id="default_company_size_max" name="default_company_size_max"
+                                   class="form-input" value="200" min="1">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="default_jobs_per_run">
+                                Default Jobs Per Run
+                            </label>
+                            <input type="number" id="default_jobs_per_run" name="default_jobs_per_run"
+                                   class="form-input" value="10" min="1" max="50">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Save Button -->
+                <div style="margin-top: 2rem; display: flex; gap: 1rem;">
+                    <button type="submit" class="btn btn-primary">
+                        💾 Save Settings
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="loadSettings()">
+                        🔄 Reset
+                    </button>
+                </div>
+            </form>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script>
+        function handleSaveSettings(event) {
+            event.preventDefault();
+            const formData = new FormData(event.target);
+            const data = Object.fromEntries(formData);
+
+            // Convert numbers
+            if (data.default_company_size_min) {
+                data.default_company_size_min = parseInt(data.default_company_size_min);
+            }
+            if (data.default_company_size_max) {
+                data.default_company_size_max = parseInt(data.default_company_size_max);
+            }
+            if (data.default_jobs_per_run) {
+                data.default_jobs_per_run = parseInt(data.default_jobs_per_run);
+            }
+
+            saveSettings(data);
+        }
+
+        // Load settings on page load
+        document.addEventListener('DOMContentLoaded', loadSettings);
+    </script>
+</body>
+</html>

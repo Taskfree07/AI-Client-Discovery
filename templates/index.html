@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Client Discovery - Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <div class="logo-icon">🎯</div>
+                <span>Client Discovery</span>
+            </div>
+
+            <nav>
+                <ul class="nav-menu">
+                    <li class="nav-item">
+                        <a href="/" class="nav-link active">
+                            <span class="nav-icon">📊</span>
+                            <span>Dashboard</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/pipeline" class="nav-link">
+                            <span class="nav-icon">🔄</span>
+                            <span>Pipeline</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/leads" class="nav-link">
+                            <span class="nav-icon">👥</span>
+                            <span>All Leads</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/emails" class="nav-link">
+                            <span class="nav-icon">✉️</span>
+                            <span>Email Queue</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/settings" class="nav-link">
+                            <span class="nav-icon">⚙️</span>
+                            <span>Settings</span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="page-header">
+                <h1 class="page-title">Dashboard</h1>
+                <p class="page-subtitle">Automated recruitment campaign management</p>
+            </div>
+
+            <!-- Stats Grid -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span class="stat-title">Total Campaigns</span>
+                        <div class="stat-icon primary">📋</div>
+                    </div>
+                    <div class="stat-value" id="totalCampaigns">-</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span class="stat-title">Active Campaigns</span>
+                        <div class="stat-icon success">✓</div>
+                    </div>
+                    <div class="stat-value" id="activeCampaigns">-</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span class="stat-title">Total Leads</span>
+                        <div class="stat-icon secondary">👥</div>
+                    </div>
+                    <div class="stat-value" id="totalLeads">-</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span class="stat-title">Emails Sent</span>
+                        <div class="stat-icon warning">✉️</div>
+                    </div>
+                    <div class="stat-value" id="emailsSent">-</div>
+                </div>
+            </div>
+
+            <!-- Campaigns Card -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Campaigns</h2>
+                    <button class="btn btn-primary" onclick="openModal('createCampaignModal')">
+                        + New Campaign
+                    </button>
+                </div>
+
+                <div class="table-container">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Keywords</th>
+                                <th>Jobs/Run</th>
+                                <th>Status</th>
+                                <th>Schedule</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="campaignsTableBody">
+                            <tr>
+                                <td colspan="6" style="text-align: center; padding: 2rem;">
+                                    <div class="loading"></div> Loading campaigns...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Recent Activity -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Recent Activity</h2>
+                </div>
+
+                <div class="table-container">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Action</th>
+                                <th>Details</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logsTableBody">
+                            <tr>
+                                <td colspan="4" style="text-align: center; padding: 2rem;">
+                                    <div class="loading"></div> Loading logs...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Create Campaign Modal -->
+    <div id="createCampaignModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Create New Campaign</h2>
+            </div>
+
+            <form id="createCampaignForm" onsubmit="handleCreateCampaign(event)">
+                <div class="form-group">
+                    <label class="form-label" for="campaign_name">Campaign Name</label>
+                    <input type="text" id="campaign_name" name="name" class="form-input" required
+                           placeholder="e.g., Software Developer Outreach">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="search_keywords">Search Keywords</label>
+                    <input type="text" id="search_keywords" name="search_keywords" class="form-input" required
+                           placeholder="e.g., software developer jobs hiring">
+                    <div class="form-hint">Keywords used to search for job openings</div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="jobs_per_run">Jobs Per Run</label>
+                    <input type="number" id="jobs_per_run" name="jobs_per_run" class="form-input"
+                           value="10" min="1" max="50" required>
+                    <div class="form-hint">Number of job openings to process per campaign run</div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Company Size Range (employees)</label>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div>
+                            <input type="number" name="company_size_min" class="form-input"
+                                   value="50" min="1" placeholder="Min">
+                        </div>
+                        <div>
+                            <input type="number" name="company_size_max" class="form-input"
+                                   value="200" min="1" placeholder="Max">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal()">
+                        Cancel
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        Create Campaign
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script>
+        // Update stats from API
+        async function updateStats() {
+            try {
+                const [campaigns, leads] = await Promise.all([
+                    fetch('/api/campaigns').then(r => r.json()),
+                    fetch('/api/leads').then(r => r.json())
+                ]);
+
+                document.getElementById('totalCampaigns').textContent = campaigns.length;
+                document.getElementById('activeCampaigns').textContent =
+                    campaigns.filter(c => c.status === 'active').length;
+                document.getElementById('totalLeads').textContent = leads.length;
+                document.getElementById('emailsSent').textContent =
+                    leads.filter(l => l.email_sent).length;
+            } catch (error) {
+                console.error('Error updating stats:', error);
+            }
+        }
+
+        function handleCreateCampaign(event) {
+            event.preventDefault();
+            const formData = new FormData(event.target);
+            const data = Object.fromEntries(formData);
+
+            // Convert numbers
+            data.jobs_per_run = parseInt(data.jobs_per_run);
+            data.company_size_min = parseInt(data.company_size_min);
+            data.company_size_max = parseInt(data.company_size_max);
+
+            createCampaign(data);
+        }
+
+        // Load data on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            updateStats();
+            setInterval(updateStats, 30000); // Update every 30 seconds
+        });
+    </script>
+</body>
+</html>

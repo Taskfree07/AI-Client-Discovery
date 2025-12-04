@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Client Discovery - Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <div class="logo-icon">🎯</div>
+                <span>Client Discovery</span>
+            </div>
+
+            <nav>
+                <ul class="nav-menu">
+                    <li class="nav-item">
+                        <a href="/" class="nav-link active">
+                            <span class="nav-icon">📊</span>
+                            <span>Dashboard</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/pipeline" class="nav-link">
+                            <span class="nav-icon">🔄</span>
+                            <span>Pipeline</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/leads" class="nav-link">
+                            <span class="nav-icon">👥</span>
+                            <span>All Leads</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/emails" class="nav-link">
+                            <span class="nav-icon">✉️</span>
+                            <span>Email Queue</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/settings" class="nav-link">
+                            <span class="nav-icon">⚙️</span>
+                            <span>Settings</span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="page-header">
+                <h1 class="page-title">Dashboard</h1>
+                <p class="page-subtitle">Automated recruitment campaign management</p>
+            </div>
+
+            <!-- Stats Grid -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span class="stat-title">Total Campaigns</span>
+                        <div class="stat-icon primary">📋</div>
+                    </div>
+                    <div class="stat-value">{{ stats.total_campaigns }}</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span class="stat-title">Active Campaigns</span>
+                        <div class="stat-icon success">✓</div>
+                    </div>
+                    <div class="stat-value">{{ stats.active_campaigns }}</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span class="stat-title">Total Leads</span>
+                        <div class="stat-icon secondary">👥</div>
+                    </div>
+                    <div class="stat-value">{{ stats.total_leads }}</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span class="stat-title">Emails Sent</span>
+                        <div class="stat-icon warning">✉️</div>
+                    </div>
+                    <div class="stat-value">{{ stats.emails_sent }}</div>
+                </div>
+            </div>
+
+            <!-- Campaigns Card -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Campaigns</h2>
+                    <a href="/" class="btn btn-primary">+ New Campaign</a>
+                </div>
+
+                <div class="table-container">
+                    {% if campaigns %}
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Keywords</th>
+                                <th>Jobs/Run</th>
+                                <th>Status</th>
+                                <th>Schedule</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for campaign in campaigns %}
+                            <tr>
+                                <td><strong>{{ campaign.name }}</strong></td>
+                                <td>{{ campaign.search_keywords }}</td>
+                                <td>{{ campaign.jobs_per_run }}</td>
+                                <td>
+                                    <span class="badge badge-{{ 'success' if campaign.status == 'active' else 'secondary' }}">
+                                        {{ campaign.status }}
+                                    </span>
+                                </td>
+                                <td>{{ campaign.schedule_frequency if campaign.schedule_enabled else 'Manual' }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📋</div>
+                        <div class="empty-state-title">No campaigns yet</div>
+                        <div class="empty-state-text">Create your first campaign to get started</div>
+                        <a href="/" class="btn btn-primary">+ Create Campaign</a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Recent Activity -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Recent Activity</h2>
+                </div>
+
+                <div class="table-container">
+                    {% if logs %}
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Action</th>
+                                <th>Details</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for log in logs %}
+                            <tr>
+                                <td>{{ log.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                <td>{{ log.action.replace('_', ' ').title() }}</td>
+                                <td>{{ log.details or '-' }}</td>
+                                <td>
+                                    <span class="badge badge-{{ 'success' if log.status == 'success' else 'danger' if log.status == 'error' else 'warning' }}">
+                                        {{ log.status }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <div class="empty-state">
+                        <div class="empty-state-text">No activity logs yet</div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

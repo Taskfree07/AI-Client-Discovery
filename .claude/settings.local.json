@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/Adil Akhtar/OneDrive/Pictures/Screenshots/**)",
+      "Bash(venvScriptspython.exe -m pip install --upgrade pip)",
+      "WebSearch",
+      "WebFetch(domain:docs.apollo.io)",
+      "Bash(\"venv/Scripts/python.exe\" -m pip install sentence-transformers==2.2.2 faiss-cpu==1.7.4 numpy==1.24.3 scikit-learn==1.3.0)",
+      "Bash(\"venv/Scripts/python.exe\" -m pip install sentence-transformers==2.2.2 faiss-cpu==1.9.0.post1 scikit-learn==1.3.0)",
+      "Bash(\"venv/Scripts/python.exe\" -m pip install sentence-transformers faiss-cpu scikit-learn --upgrade)",
+      "Bash(\"venv/Scripts/python.exe\" test_vector_search.py)",
+      "Bash(\"venv/Scripts/python.exe\" test_recruiting_filter.py)",
+      "Bash(\"venv/Scripts/python.exe\" test_company_extraction.py)",
+      "Bash(git init:*)",
+      "Bash(git add:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

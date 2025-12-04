@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Client Discovery - All Leads</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <div class="logo-icon">🎯</div>
+                <span>Client Discovery</span>
+            </div>
+
+            <nav>
+                <ul class="nav-menu">
+                    <li class="nav-item">
+                        <a href="/" class="nav-link">
+                            <span class="nav-icon">📊</span>
+                            <span>Dashboard</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/pipeline" class="nav-link">
+                            <span class="nav-icon">🔄</span>
+                            <span>Pipeline</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/leads" class="nav-link active">
+                            <span class="nav-icon">👥</span>
+                            <span>All Leads</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/emails" class="nav-link">
+                            <span class="nav-icon">✉️</span>
+                            <span>Email Queue</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/settings" class="nav-link">
+                            <span class="nav-icon">⚙️</span>
+                            <span>Settings</span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="page-header">
+                <h1 class="page-title">👥 All Discovered Leads</h1>
+                <p class="page-subtitle">Complete list of all companies and contacts discovered</p>
+            </div>
+
+            <!-- Filters -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">🔍 Filters</h2>
+                </div>
+                <div class="filter-row">
+                    <div class="form-group">
+                        <label class="form-label">Status</label>
+                        <select id="filterStatus" class="form-select" onchange="filterLeads()">
+                            <option value="">All Status</option>
+                            <option value="new">🆕 New</option>
+                            <option value="ready">✅ Ready to Send</option>
+                            <option value="contacted">📤 Email Sent</option>
+                            <option value="replied">💬 Replied</option>
+                            <option value="skipped">⏭ Skipped</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Search</label>
+                        <input type="text" id="filterSearch" class="form-input" 
+                               placeholder="Company or contact name..." onkeyup="filterLeads()">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Date Range</label>
+                        <select id="filterDate" class="form-select" onchange="filterLeads()">
+                            <option value="">All Time</option>
+                            <option value="today">Today</option>
+                            <option value="week">This Week</option>
+                            <option value="month">This Month</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-secondary" onclick="exportLeads()">
+                        📥 Export CSV
+                    </button>
+                </div>
+            </div>
+
+            <!-- Stats Summary -->
+            <div class="stats-grid stats-small">
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span class="stat-title">Total Leads</span>
+                        <div class="stat-icon primary">👥</div>
+                    </div>
+                    <div class="stat-value" id="statTotal">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span class="stat-title">Pending Review</span>
+                        <div class="stat-icon warning">⏳</div>
+                    </div>
+                    <div class="stat-value" id="statPending">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span class="stat-title">Emails Sent</span>
+                        <div class="stat-icon success">✉️</div>
+                    </div>
+                    <div class="stat-value" id="statSent">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span class="stat-title">Response Rate</span>
+                        <div class="stat-icon secondary">📈</div>
+                    </div>
+                    <div class="stat-value" id="statRate">0%</div>
+                </div>
+            </div>
+
+            <!-- Leads Table -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">📋 Lead Details</h2>
+                    <span class="badge badge-primary" id="displayCount">0 leads</span>
+                </div>
+                <div class="table-container">
+                    <table class="table" id="leadsTable">
+                        <thead>
+                            <tr>
+                                <th>Company</th>
+                                <th>Job Opening</th>
+                                <th>Decision Maker</th>
+                                <th>Email</th>
+                                <th>Company Size</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leadsTableBody">
+                            <tr>
+                                <td colspan="7" class="loading-cell">
+                                    <div class="loading"></div> Loading leads...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Lead Detail Modal -->
+    <div id="leadDetailModal" class="modal">
+        <div class="modal-content modal-lg">
+            <div class="modal-header">
+                <h2 class="modal-title">📋 Lead Details</h2>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="leadDetailContent">
+                <!-- Dynamic content -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal()">Close</button>
+                <button class="btn btn-primary" id="editEmailBtn" onclick="editEmail()">
+                    ✏️ Edit Email
+                </button>
+                <button class="btn btn-success" id="sendEmailBtn" onclick="sendLeadEmail()">
+                    📤 Send Email
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/leads.js') }}"></script>
+</body>
+</html>

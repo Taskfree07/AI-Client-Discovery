@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Client Discovery - Pipeline</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <div class="logo-icon">🎯</div>
+                <span>Client Discovery</span>
+            </div>
+
+            <nav>
+                <ul class="nav-menu">
+                    <li class="nav-item">
+                        <a href="/" class="nav-link">
+                            <span class="nav-icon">📊</span>
+                            <span>Dashboard</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/pipeline" class="nav-link active">
+                            <span class="nav-icon">🔄</span>
+                            <span>Pipeline</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/leads" class="nav-link">
+                            <span class="nav-icon">👥</span>
+                            <span>All Leads</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/emails" class="nav-link">
+                            <span class="nav-icon">✉️</span>
+                            <span>Email Queue</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/settings" class="nav-link">
+                            <span class="nav-icon">⚙️</span>
+                            <span>Settings</span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="page-header">
+                <h1 class="page-title">🔄 Discovery Pipeline</h1>
+                <p class="page-subtitle">Watch every step of the client discovery process in real-time</p>
+            </div>
+
+            <!-- Pipeline Steps Visual -->
+            <div class="pipeline-steps">
+                <div class="pipeline-step" id="step-search">
+                    <div class="step-icon">🔍</div>
+                    <div class="step-content">
+                        <div class="step-title">1. Search Jobs</div>
+                        <div class="step-desc">Find latest job openings</div>
+                    </div>
+                    <div class="step-status" id="step-search-status">Ready</div>
+                </div>
+                <div class="pipeline-arrow">→</div>
+                <div class="pipeline-step" id="step-company">
+                    <div class="step-icon">🏢</div>
+                    <div class="step-content">
+                        <div class="step-title">2. Company Intel</div>
+                        <div class="step-desc">Get company details</div>
+                    </div>
+                    <div class="step-status" id="step-company-status">Waiting</div>
+                </div>
+                <div class="pipeline-arrow">→</div>
+                <div class="pipeline-step" id="step-contact">
+                    <div class="step-icon">👔</div>
+                    <div class="step-content">
+                        <div class="step-title">3. Find CEO/Owner</div>
+                        <div class="step-desc">Reveal decision maker</div>
+                    </div>
+                    <div class="step-status" id="step-contact-status">Waiting</div>
+                </div>
+                <div class="pipeline-arrow">→</div>
+                <div class="pipeline-step" id="step-email">
+                    <div class="step-icon">✍️</div>
+                    <div class="step-content">
+                        <div class="step-title">4. Generate Email</div>
+                        <div class="step-desc">AI creates email</div>
+                    </div>
+                    <div class="step-status" id="step-email-status">Waiting</div>
+                </div>
+                <div class="pipeline-arrow">→</div>
+                <div class="pipeline-step" id="step-send">
+                    <div class="step-icon">📤</div>
+                    <div class="step-content">
+                        <div class="step-title">5. Your Review</div>
+                        <div class="step-desc">Preview & send</div>
+                    </div>
+                    <div class="step-status" id="step-send-status">Waiting</div>
+                </div>
+            </div>
+
+            <!-- Search Controls -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">🔍 Start New Discovery</h2>
+                </div>
+                <form id="discoveryForm" onsubmit="startDiscovery(event)">
+                    <div class="form-row">
+                        <div class="form-group flex-2">
+                            <label class="form-label">Search Keywords</label>
+                            <input type="text" id="searchKeywords" class="form-input"
+                                   placeholder="e.g., Python Developer" required>
+                            <div class="form-hint">What job openings to search for</div>
+                        </div>
+                        <div class="form-group flex-1">
+                            <label class="form-label">Results Per Platform</label>
+                            <input type="number" id="numResults" class="form-input"
+                                   value="5" min="1" max="10">
+                            <div class="form-hint">Higher = more results</div>
+                        </div>
+                        <div class="form-group flex-1">
+                            <label class="form-label">Min Employees</label>
+                            <input type="number" id="minEmployees" class="form-input"
+                                   value="50" min="1">
+                        </div>
+                        <div class="form-group flex-1">
+                            <label class="form-label">Max Employees</label>
+                            <input type="number" id="maxEmployees" class="form-input"
+                                   value="500" min="1">
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 1.5rem;">
+                        <div style="padding: 1rem; background: #e3f2fd; border-left: 4px solid #2196f3; border-radius: 4px;">
+                            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                                <span style="font-size: 1.2rem;">💼</span>
+                                <span style="font-weight: 600; color: #1976d2;">LinkedIn-Focused Job Discovery</span>
+                            </div>
+                            <div style="font-size: 0.9rem; color: #555;">
+                                Searches individual LinkedIn job postings, extracts company names, enriches company data via Apollo, and reveals decision-maker emails
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-lg" id="startBtn">
+                        🚀 Start LinkedIn Job Discovery
+                    </button>
+                </form>
+            </div>
+
+            <!-- Live Activity Log -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">📋 Live Activity Log</h2>
+                    <button class="btn btn-secondary btn-sm" onclick="clearLogs()">Clear</button>
+                </div>
+                <div class="activity-log" id="activityLog">
+                    <div class="log-entry log-info">
+                        <span class="log-time">--:--:--</span>
+                        <span class="log-icon">ℹ️</span>
+                        <span class="log-message">Ready to start. Enter your search criteria above.</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Discovered Leads (Real-time) -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">👥 Discovered Leads</h2>
+                    <span class="badge badge-primary" id="leadsCount">0 leads</span>
+                </div>
+                <div id="discoveredLeads" class="leads-container">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">🎯</div>
+                        <div class="empty-state-title">No leads yet</div>
+                        <div class="empty-state-text">Start the discovery pipeline to find potential clients</div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Email Preview Modal -->
+    <div id="emailPreviewModal" class="modal">
+        <div class="modal-content modal-lg">
+            <div class="modal-header">
+                <h2 class="modal-title">✉️ Email Preview</h2>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="email-preview-header">
+                    <div class="preview-row">
+                        <strong>To:</strong> <span id="previewTo">-</span>
+                    </div>
+                    <div class="preview-row">
+                        <strong>Contact:</strong> <span id="previewContact">-</span>
+                    </div>
+                    <div class="preview-row">
+                        <strong>Company:</strong> <span id="previewCompany">-</span>
+                    </div>
+                    <div class="preview-row">
+                        <strong>Subject:</strong> 
+                        <input type="text" id="previewSubject" class="form-input" style="margin-top: 0.5rem;">
+                    </div>
+                </div>
+                <div class="email-preview-body">
+                    <label class="form-label">Email Body (editable)</label>
+                    <textarea id="previewBody" class="form-textarea" rows="12"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                <button class="btn btn-warning" onclick="skipEmail()">⏭ Skip</button>
+                <button class="btn btn-success btn-lg" onclick="sendEmail()">
+                    📤 Send Email
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/pipeline.js') }}"></script>
+</body>
+</html>

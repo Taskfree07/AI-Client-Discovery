@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Client Discovery - Email Queue</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <div class="logo-icon">🎯</div>
+                <span>Client Discovery</span>
+            </div>
+
+            <nav>
+                <ul class="nav-menu">
+                    <li class="nav-item">
+                        <a href="/" class="nav-link">
+                            <span class="nav-icon">📊</span>
+                            <span>Dashboard</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/pipeline" class="nav-link">
+                            <span class="nav-icon">🔄</span>
+                            <span>Pipeline</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/leads" class="nav-link">
+                            <span class="nav-icon">👥</span>
+                            <span>All Leads</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/emails" class="nav-link active">
+                            <span class="nav-icon">✉️</span>
+                            <span>Email Queue</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/settings" class="nav-link">
+                            <span class="nav-icon">⚙️</span>
+                            <span>Settings</span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="page-header">
+                <h1 class="page-title">✉️ Email Queue</h1>
+                <p class="page-subtitle">Review and send all pending emails - YOU control when they go out</p>
+            </div>
+
+            <!-- Quick Stats -->
+            <div class="stats-grid stats-small">
+                <div class="stat-card highlight-card">
+                    <div class="stat-header">
+                        <span class="stat-title">Ready to Send</span>
+                        <div class="stat-icon warning">📤</div>
+                    </div>
+                    <div class="stat-value" id="pendingCount">0</div>
+                    <div class="stat-subtext">Waiting for your approval</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span class="stat-title">Sent Today</span>
+                        <div class="stat-icon success">✅</div>
+                    </div>
+                    <div class="stat-value" id="sentToday">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span class="stat-title">Total Sent</span>
+                        <div class="stat-icon primary">✉️</div>
+                    </div>
+                    <div class="stat-value" id="totalSent">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span class="stat-title">Skipped</span>
+                        <div class="stat-icon secondary">⏭</div>
+                    </div>
+                    <div class="stat-value" id="skippedCount">0</div>
+                </div>
+            </div>
+
+            <!-- Pending Emails Section -->
+            <div class="card highlight-section">
+                <div class="card-header">
+                    <h2 class="card-title">📬 Pending Emails - Review Before Sending</h2>
+                    <div class="header-actions">
+                        <button class="btn btn-success" onclick="sendAllPending()" id="sendAllBtn" disabled>
+                            📤 Send All Pending
+                        </button>
+                    </div>
+                </div>
+                <div id="pendingEmails" class="email-queue">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">✉️</div>
+                        <div class="empty-state-title">No pending emails</div>
+                        <div class="empty-state-text">Run the discovery pipeline to generate emails</div>
+                        <a href="/pipeline" class="btn btn-primary">Go to Pipeline</a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sent Emails History -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">📜 Sent Email History</h2>
+                </div>
+                <div class="table-container">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Sent At</th>
+                                <th>To</th>
+                                <th>Company</th>
+                                <th>Subject</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sentEmailsBody">
+                            <tr>
+                                <td colspan="6" class="loading-cell">
+                                    <div class="loading"></div> Loading...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Email Edit Modal -->
+    <div id="emailEditModal" class="modal">
+        <div class="modal-content modal-lg">
+            <div class="modal-header">
+                <h2 class="modal-title">✏️ Edit & Send Email</h2>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="email-edit-info">
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <label>Company</label>
+                            <span id="editCompany">-</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Contact</label>
+                            <span id="editContact">-</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Title</label>
+                            <span id="editTitle">-</span>
+                        </div>
+                        <div class="info-item">
+                            <label>Job Opening</label>
+                            <span id="editJob">-</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Recipient Email</label>
+                    <input type="email" id="editToEmail" class="form-input" readonly>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Subject Line</label>
+                    <input type="text" id="editSubject" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Email Body</label>
+                    <textarea id="editBody" class="form-textarea" rows="15"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                <button class="btn btn-warning" onclick="skipThisEmail()">⏭ Skip This</button>
+                <button class="btn btn-primary" onclick="saveEmailDraft()">💾 Save Draft</button>
+                <button class="btn btn-success btn-lg" onclick="sendThisEmail()">
+                    📤 Send Now
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sent Email View Modal -->
+    <div id="viewEmailModal" class="modal">
+        <div class="modal-content modal-lg">
+            <div class="modal-header">
+                <h2 class="modal-title">📧 Sent Email Details</h2>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="viewEmailContent">
+                <!-- Dynamic content -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/emails.js') }}"></script>
+</body>
+</html>
