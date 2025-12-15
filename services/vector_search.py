@@ -30,7 +30,7 @@ class VectorSearchService:
                        'all-mpnet-base-v2' - Better quality, slower
                        'paraphrase-multilingual-MiniLM-L12-v2' - Multilingual
         """
-        print(f"🔧 Initializing Vector Search Service with model: {model_name}")
+        print(f"[TECH] Initializing Vector Search Service with model: {model_name}")
         self.model = SentenceTransformer(model_name)
         self.embedding_dimension = self.model.get_sentence_embedding_dimension()
 
@@ -43,7 +43,7 @@ class VectorSearchService:
         self.SIMILARITY_THRESHOLD = 0.85  # Semantic similarity threshold for deduplication
         self.DIVERSITY_THRESHOLD = 0.75  # Similarity threshold for diversity
 
-        print(f"✅ Vector Search Service ready (embedding dim: {self.embedding_dimension})")
+        print(f"[OK] Vector Search Service ready (embedding dim: {self.embedding_dimension})")
 
     def encode_text(self, text: str) -> np.ndarray:
         """
@@ -243,7 +243,7 @@ class VectorSearchService:
         if not results or len(results) <= 1:
             return results
 
-        print(f"\n🔍 Deduplicating {len(results)} results using semantic similarity...")
+        print(f"\n[SEARCH] Deduplicating {len(results)} results using semantic similarity...")
 
         # Extract texts
         texts = [r.get(text_field, '') for r in results]
@@ -264,14 +264,14 @@ class VectorSearchService:
                 similarity = similarity_matrix[i][kept_idx]
                 if similarity >= self.SIMILARITY_THRESHOLD:
                     is_duplicate = True
-                    print(f"   ❌ Removing duplicate: '{texts[i][:60]}...' (similarity: {similarity:.2f})")
+                    print(f"   [ERROR] Removing duplicate: '{texts[i][:60]}...' (similarity: {similarity:.2f})")
                     break
 
             if not is_duplicate:
                 keep_indices.append(i)
 
         deduplicated = [results[i] for i in keep_indices]
-        print(f"✅ Kept {len(deduplicated)} unique results (removed {len(results) - len(deduplicated)} duplicates)")
+        print(f"[OK] Kept {len(deduplicated)} unique results (removed {len(results) - len(deduplicated)} duplicates)")
 
         return deduplicated
 
@@ -293,7 +293,7 @@ class VectorSearchService:
         if not results or len(results) <= max_results:
             return results
 
-        print(f"\n🎨 Ensuring diversity: selecting {max_results} diverse results from {len(results)}...")
+        print(f"\n[DESIGN] Ensuring diversity: selecting {max_results} diverse results from {len(results)}...")
 
         # Extract texts and encode
         texts = [r.get(text_field, '') for r in results]
@@ -336,7 +336,7 @@ class VectorSearchService:
                 break
 
         diverse_results = [results[i] for i in selected_indices]
-        print(f"✅ Selected {len(diverse_results)} diverse results")
+        print(f"[OK] Selected {len(diverse_results)} diverse results")
 
         return diverse_results
 
@@ -354,7 +354,7 @@ class VectorSearchService:
         if not results:
             return results
 
-        print(f"\n📊 Re-ranking {len(results)} results by semantic relevance...")
+        print(f"\n[STATS] Re-ranking {len(results)} results by semantic relevance...")
 
         # Encode query
         query_embedding = self.encode_text(query)
@@ -377,7 +377,7 @@ class VectorSearchService:
         # Sort by relevance (descending)
         ranked_results = sorted(results, key=lambda x: x['relevance_score'], reverse=True)
 
-        print("✅ Results re-ranked by relevance")
+        print("[OK] Results re-ranked by relevance")
         return ranked_results
 
     def process_search_results(self, query: str, results: List[Dict],
@@ -405,18 +405,18 @@ class VectorSearchService:
             return []
 
         print(f"\n{'='*60}")
-        print(f"🚀 VECTOR SEARCH PROCESSING PIPELINE")
+        print(f"[ROCKET] VECTOR SEARCH PROCESSING PIPELINE")
         print(f"{'='*60}")
-        print(f"📥 Input: {len(results)} raw results")
-        print(f"🎯 Query: '{query}'")
-        print(f"⚙️  Pipeline: validate={validate}, deduplicate={deduplicate}, diversity={ensure_diversity}, rerank={rerank}")
+        print(f"[INBOX] Input: {len(results)} raw results")
+        print(f"[TARGET] Query: '{query}'")
+        print(f"[SETTINGS]  Pipeline: validate={validate}, deduplicate={deduplicate}, diversity={ensure_diversity}, rerank={rerank}")
         print(f"{'='*60}\n")
 
         processed = results.copy()
 
         # Step 1: Validate and score results
         if validate:
-            print("🔍 STEP 1: Validating result quality...")
+            print("[SEARCH] STEP 1: Validating result quality...")
             valid_results = []
 
             for result in processed:
@@ -426,12 +426,12 @@ class VectorSearchService:
 
                 if is_valid:
                     valid_results.append(result)
-                    print(f"   ✅ Valid (score: {quality_score:.2f}): {result.get('title', '')[:60]}...")
+                    print(f"   [OK] Valid (score: {quality_score:.2f}): {result.get('title', '')[:60]}...")
                 else:
-                    print(f"   ❌ Invalid (score: {quality_score:.2f}): {result.get('title', '')[:60]}... | Reason: {reason}")
+                    print(f"   [ERROR] Invalid (score: {quality_score:.2f}): {result.get('title', '')[:60]}... | Reason: {reason}")
 
             processed = valid_results
-            print(f"\n✅ Validation complete: {len(processed)} valid results\n")
+            print(f"\n[OK] Validation complete: {len(processed)} valid results\n")
 
         # Step 2: Semantic deduplication
         if deduplicate and len(processed) > 1:
@@ -449,9 +449,9 @@ class VectorSearchService:
             processed = processed[:max_results]
 
         print(f"\n{'='*60}")
-        print(f"✅ PIPELINE COMPLETE")
+        print(f"[OK] PIPELINE COMPLETE")
         print(f"{'='*60}")
-        print(f"📤 Output: {len(processed)} high-quality, diverse results")
+        print(f"[OUTBOX] Output: {len(processed)} high-quality, diverse results")
         print(f"{'='*60}\n")
 
         return processed

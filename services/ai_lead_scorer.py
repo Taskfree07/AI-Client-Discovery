@@ -305,23 +305,23 @@ class AILeadScorer:
 
         # Company quality insights
         if scores['company_quality'] >= 20:
-            insights.append("💎 Premium company profile with strong fundamentals")
+            insights.append("[PREMIUM] Premium company profile with strong fundamentals")
         elif scores['company_quality'] < 10:
-            insights.append("⚠️ Limited company information available")
+            insights.append("[WARN] Limited company information available")
 
         # Contact quality insights
         if scores['contact_quality'] >= 15:
-            insights.append("🎯 Direct access to C-level decision maker")
+            insights.append("[TARGET] Direct access to C-level decision maker")
         elif scores['contact_quality'] < 10:
-            insights.append("📧 Email quality needs verification")
+            insights.append("[EMAIL] Email quality needs verification")
 
         # Job relevance insights
         if scores['job_relevance'] >= 15:
-            insights.append("✅ Highly relevant job opening")
+            insights.append("[OK] Highly relevant job opening")
 
         # Tech stack insights
         if scores['tech_stack_fit'] >= 6:
-            insights.append("🚀 Modern tech stack indicates growth")
+            insights.append("[ROCKET] Modern tech stack indicates growth")
 
         return insights
 
@@ -332,22 +332,22 @@ class AILeadScorer:
         total = sum(scores.values())
 
         if total >= 75:
-            recs.append("🔥 Priority lead - reach out immediately")
-            recs.append("💼 Consider personalized video message")
+            recs.append("[FIRE] Priority lead - reach out immediately")
+            recs.append("[BUSINESS] Consider personalized video message")
         elif total >= 60:
-            recs.append("👍 Strong lead - add to top of queue")
-            recs.append("📝 Customize email with specific company details")
+            recs.append("[THUMBSUP] Strong lead - add to top of queue")
+            recs.append("[NOTE] Customize email with specific company details")
         elif total < 50:
-            recs.append("🤔 Consider if worth pursuing")
+            recs.append("[THINK] Consider if worth pursuing")
             if scores['contact_quality'] < 10:
-                recs.append("📧 Verify email before sending")
+                recs.append("[EMAIL] Verify email before sending")
 
         # Specific recommendations
         if scores['job_relevance'] < 10:
-            recs.append("⚠️ Job may not be highly relevant - review carefully")
+            recs.append("[WARN] Job may not be highly relevant - review carefully")
 
         if not lead.get('contact_email'):
-            recs.append("❗ No email available - need to find contact")
+            recs.append("[!] No email available - need to find contact")
 
         return recs
 

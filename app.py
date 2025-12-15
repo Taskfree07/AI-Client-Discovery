@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request, jsonify, session
 from flask_cors import CORS
 from config import Config
-from models import db, Settings, Campaign, EmailTemplate, JobLead, ActivityLog
+from models import db, Settings, Campaign, EmailTemplate, JobLead, ActivityLog, ManufacturingICPCampaign, ManufacturingLead
 from services.google_search import GoogleSearchService
 from services.apollo_api import ApolloAPIService
 from services.email_generator import EmailGenerator
@@ -13,6 +13,7 @@ from services.ai_lead_scorer import AILeadScorer
 from datetime import datetime
 from urllib.parse import urlparse
 import os
+import json
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -531,8 +532,8 @@ def pipeline_search():
         google_search = GoogleSearchService(google_api_key, google_cx, use_vector_search=True)
         job_parser = JobParserService(google_api_key, google_cx)
 
-        print(f"\n🔍 Starting LinkedIn job search for: '{keywords}'")
-        print(f"📊 Requesting {num_results} individual job postings\n")
+        print(f"\n[SEARCH] Starting LinkedIn job search for: '{keywords}'")
+        print(f"[STATS] Requesting {num_results} individual job postings\n")
 
         # Search for individual LinkedIn job postings only (with vector search enabled)
         search_results = google_search.search_linkedin_jobs(keywords, num_results, use_enhanced_search=True)
@@ -543,7 +544,7 @@ def pipeline_search():
                 'message': 'No LinkedIn jobs found. Try different keywords or check your Google API quota.'
             })
 
-        print(f"\n✅ Found {len(search_results)} LinkedIn job postings")
+        print(f"\n[OK] Found {len(search_results)} LinkedIn job postings")
         print("="*60)
 
         # Parse each search result to extract job and company information
@@ -565,7 +566,7 @@ def pipeline_search():
 
             # Skip if we couldn't extract company name
             if company_name == "Unknown Company":
-                print(f"   ⚠️ Skipping - could not extract company name")
+                print(f"   [WARN] Skipping - could not extract company name")
                 continue
 
             # Validate parsed job title if vector search is enabled
@@ -579,23 +580,23 @@ def pipeline_search():
                 is_valid, quality_score, reason = validator.validate_job_result(validation_result)
 
                 if not is_valid or quality_score < 0.4:
-                    print(f"   ❌ Invalid job (score: {quality_score:.2f}): {reason}")
+                    print(f"   [ERROR] Invalid job (score: {quality_score:.2f}): {reason}")
                     print(f"      Job title: {job_title[:60]}")
                     continue
                 else:
-                    print(f"   ✅ Valid job (quality: {quality_score:.2f})")
+                    print(f"   [OK] Valid job (quality: {quality_score:.2f})")
 
             # Skip duplicate companies (same company, different job)
             if company_name.lower() in seen_companies:
-                print(f"   ⚠️ Skipping duplicate company: {company_name}")
+                print(f"   [WARN] Skipping duplicate company: {company_name}")
                 continue
 
             # Find company domain
-            print(f"   🔍 Finding domain for: {company_name}")
+            print(f"   [SEARCH] Finding domain for: {company_name}")
             domain = job_parser.find_company_domain(company_name)
 
             if not domain:
-                print(f"   ⚠️ Could not find domain for company: {company_name}")
+                print(f"   [WARN] Could not find domain for company: {company_name}")
                 continue
 
             seen_companies.add(company_name.lower())
@@ -609,11 +610,11 @@ def pipeline_search():
                 'company_name': company_name
             })
 
-            print(f"   ✅ Added: {parsed_job['job_title']} at {company_name}")
-            print(f"   🌐 Domain: {domain}")
+            print(f"   [OK] Added: {parsed_job['job_title']} at {company_name}")
+            print(f"   [WEB] Domain: {domain}")
 
         print("\n" + "="*60)
-        print(f"🎯 Final Results: {len(formatted_jobs)} unique companies with job openings\n")
+        print(f"[RESULT] Final Results: {len(formatted_jobs)} unique companies with job openings\n")
 
         log_activity(None, 'pipeline_search', f'Found {len(formatted_jobs)} LinkedIn jobs for "{keywords}"', 'success')
 
@@ -624,7 +625,7 @@ def pipeline_search():
         })
 
     except Exception as e:
-        print(f"\n❌ Pipeline search error: {str(e)}")
+        print(f"\n[ERROR] Pipeline search error: {str(e)}")
         import traceback
         traceback.print_exc()
         log_activity(None, 'pipeline_search', str(e), 'error')
@@ -647,7 +648,7 @@ def pipeline_company():
                 'message': 'Apollo API not configured. Go to Settings.'
             })
 
-        print(f"\n🏢 Enriching company: {domain}")
+        print(f"\n[COMPANY] Enriching company: {domain}")
 
         apollo = ApolloAPIService(apollo_api_key)
 
@@ -672,7 +673,7 @@ def pipeline_company():
                 'message': f'Company size ({employees} employees) outside range ({min_employees}-{max_employees})'
             })
 
-        print(f"✅ Company enriched: {org_data.get('name')} ({employees} employees)")
+        print(f"[OK] Company enriched: {org_data.get('name')} ({employees} employees)")
 
         return jsonify({
             'success': True,
@@ -723,7 +724,7 @@ def pipeline_company():
         })
 
     except Exception as e:
-        print(f"❌ Error enriching company: {str(e)}")
+        print(f"[ERROR] Error enriching company: {str(e)}")
         return jsonify({'success': False, 'message': str(e)})
 
 @app.route('/api/pipeline/contact', methods=['POST'])
@@ -741,7 +742,7 @@ def pipeline_contact():
         if not apollo_api_key:
             return jsonify({'success': False, 'message': 'Apollo API not configured'})
 
-        print(f"\n👔 Finding {role_type} decision makers for: {domain}")
+        print(f"\n[CONTACT] Finding {role_type} decision makers for: {domain}")
 
         apollo = ApolloAPIService(apollo_api_key)
 
@@ -787,8 +788,8 @@ def pipeline_contact():
         # Get the primary contact (first one, usually highest ranking)
         primary_contact = formatted_contacts[0]
 
-        print(f"✅ Found {len(formatted_contacts)} contacts, primary: {primary_contact.get('name')} - {primary_contact.get('title')}")
-        print(f"🔐 Unlocking email for primary contact...")
+        print(f"[OK] Found {len(formatted_contacts)} contacts, primary: {primary_contact.get('name')} - {primary_contact.get('title')}")
+        print(f"[LOCK] Unlocking email for primary contact...")
 
         # Reveal email for primary contact
         enriched_contact = apollo.enrich_person(
@@ -802,21 +803,21 @@ def pipeline_contact():
                 primary_contact['email'] = enriched_contact.get('email')
                 primary_contact['email_status'] = enriched_contact.get('email_status', 'verified')
                 primary_contact['email_revealed'] = True
-                print(f"✅ Email unlocked: {primary_contact['email']}")
+                print(f"[OK] Email unlocked: {primary_contact['email']}")
             else:
                 # No email from Apollo - include status and guessed emails
                 primary_contact['email_status'] = enriched_contact.get('email_status', 'unavailable')
                 primary_contact['email_status_explanation'] = enriched_contact.get('email_status_explanation', '')
                 primary_contact['guessed_emails'] = enriched_contact.get('guessed_emails', [])
-                print(f"⚠️ No email from Apollo - status: {primary_contact['email_status']}")
+                print(f"[WARN] No email from Apollo - status: {primary_contact['email_status']}")
                 if primary_contact.get('guessed_emails'):
-                    print(f"💡 Suggested emails: {', '.join(primary_contact['guessed_emails'][:3])}")
+                    print(f"[TIP] Suggested emails: {', '.join(primary_contact['guessed_emails'][:3])}")
             
             formatted_contacts[0] = primary_contact
         
         # If reveal_all is True, reveal emails for all contacts
         if reveal_all and len(formatted_contacts) > 1:
-            print(f"\n🔐 Revealing emails for remaining {len(formatted_contacts) - 1} contacts...")
+            print(f"\n[LOCK] Revealing emails for remaining {len(formatted_contacts) - 1} contacts...")
             for i, contact in enumerate(formatted_contacts[1:], 1):
                 enriched = apollo.enrich_person(
                     person_id=contact.get('id'),
@@ -841,7 +842,7 @@ def pipeline_contact():
         })
 
     except Exception as e:
-        print(f"❌ Error finding contact: {str(e)}")
+        print(f"[ERROR] Error finding contact: {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'message': str(e)})
@@ -861,7 +862,7 @@ def pipeline_reveal_email():
         if not person_id:
             return jsonify({'success': False, 'message': 'Person ID required'})
 
-        print(f"\n🔐 Manual email reveal requested for person ID: {person_id}")
+        print(f"\n[LOCK] Manual email reveal requested for person ID: {person_id}")
 
         apollo = ApolloAPIService(apollo_api_key)
 
@@ -885,7 +886,7 @@ def pipeline_reveal_email():
             })
 
     except Exception as e:
-        print(f"❌ Error in reveal-email endpoint: {str(e)}")
+        print(f"[ERROR] Error in reveal-email endpoint: {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'message': str(e)})
@@ -1182,6 +1183,296 @@ def get_dashboard_analytics():
         })
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)})
+
+# ==================== MANUFACTURING ICP API ====================
+
+@app.route('/manufacturing-icp')
+def manufacturing_icp_page():
+    """Manufacturing ICP lead generator page"""
+    return render_template('manufacturing_icp.html')
+
+@app.route('/api/manufacturing-icp/campaigns', methods=['GET'])
+def get_manufacturing_campaigns():
+    """Get all Manufacturing ICP campaigns"""
+    campaigns = ManufacturingICPCampaign.query.order_by(ManufacturingICPCampaign.created_at.desc()).all()
+    return jsonify([c.to_dict() for c in campaigns])
+
+@app.route('/api/manufacturing-icp/generate', methods=['POST'])
+def generate_manufacturing_leads():
+    """Generate Manufacturing ICP leads with custom filters"""
+    try:
+        data = request.json
+
+        # Get Apollo API key
+        apollo_api_key = get_setting('apollo_api_key')
+        if not apollo_api_key:
+            return jsonify({
+                'success': False,
+                'message': 'Apollo API key not configured. Go to Settings.'
+            })
+
+        # Extract filters from request (can be at root or inside 'filters' object)
+        filters_data = data.get('filters', data)  # Support both formats
+
+        # Create campaign
+        campaign = ManufacturingICPCampaign(
+            name=data.get('campaign_name', 'Manufacturing ICP'),
+            t1_target=int(data.get('t1_target', data.get('t1_count', 20))),
+            t2_target=int(data.get('t2_target', data.get('t2_count', 20))),
+            t3_target=int(data.get('t3_target', data.get('t3_count', 10))),
+            industries=json.dumps(filters_data.get('industries', [])),
+            t1_titles=json.dumps(filters_data.get('t1_titles', [])),
+            t2_titles=json.dumps(filters_data.get('t2_titles', [])),
+            t3_titles=json.dumps(filters_data.get('t3_titles', [])),
+            locations=json.dumps(filters_data.get('locations', {'usa': True, 'india': True})),
+            size_min=int(filters_data.get('size_min', 200)),
+            size_max=int(filters_data.get('size_max', 10000)),
+            min_validation_score=int(filters_data.get('min_validation_score', filters_data.get('min_score', 4))),
+            status='in_progress'
+        )
+
+        db.session.add(campaign)
+        db.session.commit()
+
+        log_activity(None, 'manufacturing_icp_started', f'Started Manufacturing ICP campaign: {campaign.name}', 'success')
+
+        # Generate leads with RAG-powered intelligence
+        from services.manufacturing_icp import ManufacturingICPService
+
+        print(f"[DEBUG] Initializing Manufacturing ICP service...")
+        print(f"[DEBUG] Apollo API key: {apollo_api_key[:10]}...")
+        
+        # Initialize service with RAG ENABLED for 10-20x speedup
+        try:
+            service = ManufacturingICPService(
+                apollo_api_key,
+                use_rag=True,  # Enable RAG for semantic pre-filtering
+                use_ollama=False  # Use sentence-transformers (faster, no Ollama needed)
+            )
+            print(f"[DEBUG] Service initialized successfully with RAG intelligence")
+        except Exception as e:
+            print(f"[ERROR] Failed to initialize service: {e}")
+            raise
+
+        filters = {
+            'industries': json.loads(campaign.industries) if campaign.industries else None,
+            # Don't include empty title lists - let service use its defaults
+            'locations': json.loads(campaign.locations) if campaign.locations else None,
+            'size_min': campaign.size_min,
+            'size_max': campaign.size_max,
+            'min_validation_score': campaign.min_validation_score
+        }
+        
+        # Only add title filters if they are non-empty arrays
+        t1_titles = json.loads(campaign.t1_titles) if campaign.t1_titles else []
+        if t1_titles:
+            filters['t1_titles'] = t1_titles
+            
+        t2_titles = json.loads(campaign.t2_titles) if campaign.t2_titles else []
+        if t2_titles:
+            filters['t2_titles'] = t2_titles
+            
+        t3_titles = json.loads(campaign.t3_titles) if campaign.t3_titles else []
+        if t3_titles:
+            filters['t3_titles'] = t3_titles
+        
+        print(f"[DEBUG] Filters: industries={len(filters.get('industries') or [])}, locations={filters.get('locations')}")
+        print(f"[DEBUG] Size range: {filters['size_min']}-{filters['size_max']}")
+        print(f"[DEBUG] Calling generate_leads...")
+
+        results = service.generate_leads(campaign, filters)
+        
+        print(f"[DEBUG] Lead generation complete!")
+        print(f"[DEBUG] Results: T1={len(results['t1_leads'])}, T2={len(results['t2_leads'])}, T3={len(results['t3_leads'])}")
+
+        # Save leads to database
+        total_saved = 0
+        for lead_data in results['t1_leads'] + results['t2_leads'] + results['t3_leads']:
+            lead = ManufacturingLead(
+                campaign_id=campaign.id,
+                tier=lead_data['tier'],
+                company_name=lead_data['company']['name'],
+                company_domain=lead_data['company']['domain'],
+                company_size=lead_data['company']['size'],
+                company_industry=lead_data['company']['industry'],
+                company_location=lead_data['company']['location'],
+                company_revenue=lead_data['company']['revenue'],
+                company_linkedin=lead_data['company']['linkedin'],
+                company_website=lead_data['company']['website'],
+                contact_name=lead_data['contact']['name'],
+                contact_title=lead_data['contact']['title'],
+                contact_email=lead_data['contact']['email'],
+                contact_phone=lead_data['contact']['phone'],
+                contact_linkedin=lead_data['contact']['linkedin'],
+                email_status=lead_data['contact']['email_status'],
+                validation_score=lead_data['validation']['score'],
+                validation_details=json.dumps(lead_data['validation']),
+                status='new'
+            )
+            db.session.add(lead)
+            total_saved += 1
+
+        # Update campaign status
+        campaign.status = 'completed'
+        campaign.total_leads = total_saved
+        campaign.t1_generated = len(results['t1_leads'])
+        campaign.t2_generated = len(results['t2_leads'])
+        campaign.t3_generated = len(results['t3_leads'])
+        campaign.avg_validation_score = results['avg_score']
+        campaign.completed_at = datetime.utcnow()
+
+        db.session.commit()
+
+        log_activity(None, 'manufacturing_icp_completed',
+                    f'Completed Manufacturing ICP campaign: {campaign.name}. Generated {total_saved} leads.',
+                    'success')
+
+        # Get all saved leads for return
+        all_leads = ManufacturingLead.query.filter_by(campaign_id=campaign.id).all()
+        leads_data = [lead.to_dict() for lead in all_leads]
+
+        return jsonify({
+            'success': True,
+            'campaign_id': campaign.id,
+            'total_leads': total_saved,
+            't1_count': len(results['t1_leads']),
+            't2_count': len(results['t2_leads']),
+            't3_count': len(results['t3_leads']),
+            'avg_score': results['avg_score'],
+            'leads': leads_data,
+            'summary': {
+                'total_generated': total_saved,
+                'avg_score': results['avg_score']
+            }
+        })
+
+    except Exception as e:
+        print(f"[ERROR] Manufacturing ICP generation failed: {str(e)}")
+        import traceback
+        traceback.print_exc()
+
+        if 'campaign' in locals():
+            campaign.status = 'failed'
+            db.session.commit()
+
+        log_activity(None, 'manufacturing_icp_failed', str(e), 'error')
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/manufacturing-icp/leads/<int:campaign_id>', methods=['GET'])
+def get_manufacturing_leads(campaign_id):
+    """Get all leads for a Manufacturing ICP campaign"""
+    campaign = ManufacturingICPCampaign.query.get_or_404(campaign_id)
+    leads = ManufacturingLead.query.filter_by(campaign_id=campaign_id).all()
+    
+    return jsonify({
+        'success': True,
+        'campaign': campaign.to_dict(),
+        'leads': [lead.to_dict() for lead in leads]
+    })
+
+@app.route('/api/manufacturing-icp/export/<int:campaign_id>', methods=['GET'])
+def export_manufacturing_leads(campaign_id):
+    """Export Manufacturing ICP leads to Excel"""
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill, Alignment
+        from flask import send_file
+        import io
+
+        campaign = ManufacturingICPCampaign.query.get_or_404(campaign_id)
+        leads = ManufacturingLead.query.filter_by(campaign_id=campaign_id).all()
+
+        # Create workbook
+        wb = Workbook()
+        wb.remove(wb.active)  # Remove default sheet
+
+        # Create summary sheet
+        ws_summary = wb.create_sheet("Summary")
+        ws_summary.append(['Campaign Name', campaign.name])
+        ws_summary.append(['Total Leads', campaign.total_leads])
+        ws_summary.append(['T1 Leads', campaign.t1_generated])
+        ws_summary.append(['T2 Leads', campaign.t2_generated])
+        ws_summary.append(['T3 Leads', campaign.t3_generated])
+        ws_summary.append(['Avg Validation Score', f"{campaign.avg_validation_score}/6"])
+        ws_summary.append(['Date Generated', campaign.completed_at.strftime('%Y-%m-%d %H:%M') if campaign.completed_at else 'N/A'])
+
+        # Header style
+        header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+        header_font = Font(color="FFFFFF", bold=True)
+
+        # Helper function to create tier sheet
+        def create_tier_sheet(tier_name, tier_leads):
+            ws = wb.create_sheet(tier_name)
+            headers = ['Company', 'Contact Name', 'Title', 'Email', 'Phone', 'Size', 'Industry',
+                      'Location', 'Revenue', 'LinkedIn', 'Website', 'Validation Score', 'Checklist']
+            ws.append(headers)
+
+            # Style headers
+            for cell in ws[1]:
+                cell.fill = header_fill
+                cell.font = header_font
+                cell.alignment = Alignment(horizontal='center')
+
+            # Add data
+            for lead in tier_leads:
+                validation = json.loads(lead.validation_details) if lead.validation_details else {}
+                checklist_summary = f"{lead.validation_score}/6"
+
+                ws.append([
+                    lead.company_name,
+                    lead.contact_name,
+                    lead.contact_title,
+                    lead.contact_email,
+                    lead.contact_phone,
+                    lead.company_size,
+                    lead.company_industry,
+                    lead.company_location,
+                    lead.company_revenue,
+                    lead.contact_linkedin,
+                    lead.company_website,
+                    checklist_summary,
+                    ', '.join([k for k, v in validation.get('checklist', {}).items() if v.get('passed')])
+                ])
+
+            # Auto-adjust column widths
+            for column in ws.columns:
+                max_length = 0
+                column = [cell for cell in column]
+                for cell in column:
+                    if cell.value:
+                        max_length = max(max_length, len(str(cell.value)))
+                adjusted_width = min(max_length + 2, 50)
+                ws.column_dimensions[column[0].column_letter].width = adjusted_width
+
+        # Create sheets for each tier
+        t1_leads = [l for l in leads if l.tier == 'T1']
+        t2_leads = [l for l in leads if l.tier == 'T2']
+        t3_leads = [l for l in leads if l.tier == 'T3']
+
+        if t1_leads:
+            create_tier_sheet('T1_Decision_Makers', t1_leads)
+        if t2_leads:
+            create_tier_sheet('T2_HR_Leaders', t2_leads)
+        if t3_leads:
+            create_tier_sheet('T3_HR_Practitioners', t3_leads)
+
+        # Save to BytesIO
+        excel_file = io.BytesIO()
+        wb.save(excel_file)
+        excel_file.seek(0)
+
+        filename = f"Manufacturing_ICP_{campaign.name.replace(' ', '_')}_{campaign.total_leads}leads.xlsx"
+
+        return send_file(
+            excel_file,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name=filename
+        )
+
+    except Exception as e:
+        print(f"[ERROR] Export failed: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 # Initialize database and create default data
 def init_db():

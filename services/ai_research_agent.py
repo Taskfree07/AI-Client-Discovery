@@ -39,7 +39,7 @@ class AIResearchAgent:
         Returns:
             Research report with insights and recommendations
         """
-        print(f"\n🔬 AI Research Agent: Analyzing {company_name}...")
+        print(f"\n[PROCESS] AI Research Agent: Analyzing {company_name}...")
 
         research = {
             'company_name': company_name,
@@ -74,7 +74,7 @@ class AIResearchAgent:
         # 7. Create executive summary
         research['executive_summary'] = self._create_executive_summary(research)
 
-        print(f"✅ Research complete for {company_name}")
+        print(f"[OK] Research complete for {company_name}")
         return research
 
     def _analyze_company_profile(self, company_data: Dict) -> Dict:
@@ -104,13 +104,13 @@ class AIResearchAgent:
         revenue = company_data.get('annual_revenue_printed', '')
         if revenue:
             profile['key_facts'].append(f"Annual revenue: {revenue}")
-            profile['highlights'].append(f"💰 Revenue: {revenue}")
+            profile['highlights'].append(f"[MONEY] Revenue: {revenue}")
 
         # Funding
         funding = company_data.get('total_funding_printed', '')
         if funding:
             profile['key_facts'].append(f"Total funding raised: {funding}")
-            profile['highlights'].append(f"🚀 Funding: {funding}")
+            profile['highlights'].append(f"[ROCKET] Funding: {funding}")
 
             latest_round = company_data.get('latest_funding_round_type', '')
             if latest_round:
@@ -138,7 +138,7 @@ class AIResearchAgent:
         # Public status
         if company_data.get('publicly_traded_symbol'):
             symbol = company_data['publicly_traded_symbol']
-            profile['highlights'].append(f"📈 Publicly traded: {symbol}")
+            profile['highlights'].append(f"[CHART] Publicly traded: {symbol}")
             profile['overview'].append("Publicly traded company - financial transparency")
 
         return profile
@@ -162,7 +162,7 @@ class AIResearchAgent:
         # Large tech stack = active development
         tech_count = len(company_data.get('technologies', []))
         if tech_count > 15:
-            signals['positive'].append(f"🔧 Diverse tech stack ({tech_count} technologies)")
+            signals['positive'].append(f"[TECH] Diverse tech stack ({tech_count} technologies)")
             score += 1
         elif tech_count > 5:
             signals['neutral'].append(f"Standard tech stack ({tech_count} technologies)")
@@ -171,17 +171,17 @@ class AIResearchAgent:
         dept_headcount = company_data.get('departmental_head_count', {})
         if dept_headcount:
             if dept_headcount.get('engineering', 0) > 50:
-                signals['positive'].append("👨‍💻 Large engineering team - actively building")
+                signals['positive'].append("[ENGINEER] Large engineering team - actively building")
                 score += 1
 
             if dept_headcount.get('sales', 0) > 20:
-                signals['positive'].append("💼 Growing sales team - scaling revenue")
+                signals['positive'].append("[BUSINESS] Growing sales team - scaling revenue")
                 score += 1
 
         # Employee count range suggests growth
         employees = company_data.get('estimated_num_employees', 0)
         if 50 <= employees <= 500:
-            signals['positive'].append("📈 In rapid growth employee range (50-500)")
+            signals['positive'].append("[CHART] In rapid growth employee range (50-500)")
             score += 1
 
         signals['score'] = min(score, 10)
@@ -261,14 +261,14 @@ class AIResearchAgent:
 
         # Generate insights
         if insights['categories'].get('AI/ML'):
-            insights['insights'].append("🤖 Using AI/ML - cutting edge tech company")
+            insights['insights'].append("[AI] Using AI/ML - cutting edge tech company")
 
         if insights['categories'].get('Cloud'):
-            insights['insights'].append("☁️ Cloud-native infrastructure - modern architecture")
+            insights['insights'].append("[CLOUD] Cloud-native infrastructure - modern architecture")
 
         if len(insights['categories']) >= 5:
             insights['tech_maturity'] = "Advanced - diverse modern stack"
-            insights['insights'].append("💎 Sophisticated tech organization")
+            insights['insights'].append("[PREMIUM] Sophisticated tech organization")
         elif len(insights['categories']) >= 3:
             insights['tech_maturity'] = "Mature - solid tech foundation"
         else:

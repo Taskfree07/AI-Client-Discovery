@@ -24,11 +24,11 @@ class GoogleSearchService:
         self.vector_search = None
         if use_vector_search:
             try:
-                print("🚀 Initializing Vector Search Service...")
+                print("[*] Initializing Vector Search Service...")
                 self.vector_search = VectorSearchService()
-                print("✅ Vector Search ready for enhanced job search\n")
+                print("[+] Vector Search ready for enhanced job search\n")
             except Exception as e:
-                print(f"⚠️ Could not initialize Vector Search: {e}")
+                print(f"[!] Could not initialize Vector Search: {e}")
                 print("   Falling back to standard search\n")
                 self.use_vector_search = False
 
@@ -77,7 +77,7 @@ class GoogleSearchService:
 
             # Apply vector search processing if enabled
             if use_enhanced_search and self.use_vector_search and self.vector_search:
-                print(f"\n🔬 Applying Vector Search Processing...")
+                print(f"\n[*] Applying Vector Search Processing...")
                 results = self.vector_search.process_search_results(
                     query=keywords,
                     results=results,
@@ -156,7 +156,7 @@ class GoogleSearchService:
                                     'platform': 'LinkedIn'
                                 })
 
-                                print(f"✓ Found LinkedIn job: {item.get('title', '')[:50]}...")
+                                print(f"[+] Found LinkedIn job: {item.get('title', '')[:50]}...")
 
                 print(f"Found {len(data.get('items', []))} results in this batch")
 
@@ -168,7 +168,7 @@ class GoogleSearchService:
 
         # Apply vector search processing if enabled
         if use_enhanced_search and self.use_vector_search and self.vector_search and len(all_results) > 0:
-            print(f"\n🔬 Applying Vector Search Processing to LinkedIn results...")
+            print(f"\n[*] Applying Vector Search Processing to LinkedIn results...")
             all_results = self.vector_search.process_search_results(
                 query=keywords,
                 results=all_results,

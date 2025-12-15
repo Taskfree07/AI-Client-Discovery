@@ -52,7 +52,7 @@ class JobParserService:
             # Remove common recruiting agency words if present
             company = re.sub(r'\s+(recruiting|staffing|solutions|inc\.|ltd\.|llc)$', '', company, flags=re.IGNORECASE)
             if len(company) > 2 and len(company) < 100:
-                print(f"   🎯 Extracted company from 'X hiring Y' pattern: {company}")
+                print(f"   [TARGET] Extracted company from 'X hiring Y' pattern: {company}")
                 return company
 
         # LinkedIn format: "Job Title - Company Name | LinkedIn" or "Job Title - Company Name - Location | LinkedIn"

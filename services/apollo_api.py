@@ -60,9 +60,10 @@ class ApolloAPIService:
         - Keywords and specializations
         """
         try:
-            print(f"🔍 Enriching company data for: {domain}")
+            print(f"[SEARCH] Enriching company data for: {domain}")
 
-            url = f"{self.base_url}/v1/organizations/enrich"
+            # Use correct Apollo API endpoint
+            url = f"{self.base_url}/api/v1/organizations/enrich"
             params = {
                 'domain': domain
             }
@@ -158,23 +159,23 @@ class ApolloAPIService:
                     'departmental_head_count': org.get('departmental_head_count', {})
                 }
 
-                print(f"✅ Enriched: {enriched_data['name']}")
-                print(f"   📊 Employees: {enriched_data['estimated_num_employees']}")
-                print(f"   🏭 Industry: {enriched_data['industry']}")
+                print(f"[OK] Enriched: {enriched_data['name']}")
+                print(f"   [STATS] Employees: {enriched_data['estimated_num_employees']}")
+                print(f"   [INDUSTRY] Industry: {enriched_data['industry']}")
                 if annual_revenue_printed:
-                    print(f"   💰 Revenue: {annual_revenue_printed}")
+                    print(f"   [MONEY] Revenue: {annual_revenue_printed}")
                 if total_funding_printed:
-                    print(f"   🚀 Funding: {total_funding_printed}")
+                    print(f"   [ROCKET] Funding: {total_funding_printed}")
                 if enriched_data['technology_names']:
-                    print(f"   🔧 Tech Stack: {', '.join(enriched_data['technology_names'][:5])}")
+                    print(f"   [TECH] Tech Stack: {', '.join(enriched_data['technology_names'][:5])}")
                 
                 return enriched_data
 
-            print(f"⚠️ No organization data found for {domain}")
+            print(f"[WARN] No organization data found for {domain}")
             return None
 
         except Exception as e:
-            print(f"❌ Error enriching organization {domain}: {str(e)}")
+            print(f"[ERROR] Error enriching organization {domain}: {str(e)}")
             return None
 
     def find_contacts(self, domain: str, titles: List[str] = None, 
@@ -207,7 +208,7 @@ class ApolloAPIService:
             ]
 
         try:
-            print(f"\n🔍 Searching for contacts at {domain}")
+            print(f"\n[SEARCH] Searching for contacts at {domain}")
             print(f"   Reveal emails: {reveal_emails}")
             print(f"   Per page: {per_page}")
 
@@ -271,16 +272,16 @@ class ApolloAPIService:
                     contacts.append(contact)
 
                     # Log contact info
-                    status_icon = "✅" if email else "⚠️"
+                    status_icon = "[OK]" if email else "[WARN]"
                     email_display = email if email else f"No email (status: {email_status})"
                     print(f"   {status_icon} [{role_category}] {person.get('name')} - {person.get('title')}")
-                    print(f"      📧 {email_display}")
+                    print(f"      [EMAIL] {email_display}")
 
-            print(f"\n✅ Total contacts found: {len(contacts)}")
+            print(f"\n[OK] Total contacts found: {len(contacts)}")
             return contacts
 
         except Exception as e:
-            print(f"❌ Error finding contacts for {domain}: {str(e)}")
+            print(f"[ERROR] Error finding contacts for {domain}: {str(e)}")
             return []
     
     def _categorize_role(self, title: str) -> str:
@@ -306,6 +307,102 @@ class ApolloAPIService:
         else:
             return 'Other'
     
+    def search_people(self, person_titles: List[str] = None, person_locations: List[str] = None,
+                     organization_num_employees_ranges: List[str] = None, 
+                     person_seniorities: List[str] = None, organization_industry_tag_ids: List[str] = None,
+                     per_page: int = 25, page: int = 1) -> List[Dict]:
+        """
+        Search for people across companies using Apollo's /people_search endpoint
+        
+        Args:
+            person_titles: List of job titles to search for
+            person_locations: List of locations (e.g., ['United States', 'India'])
+            organization_num_employees_ranges: List of employee ranges (e.g., ['200,10000'])
+            person_seniorities: List of seniority levels
+            organization_industry_tag_ids: List of industry IDs
+            per_page: Results per page (max 100)
+            page: Page number
+            
+        Returns:
+            List of contact dictionaries
+        """
+        try:
+            print(f"\n[SEARCH] Searching for people using /people_search")
+            if person_titles:
+                print(f"   Titles: {person_titles[:3]}..." if len(person_titles) > 3 else f"   Titles: {person_titles}")
+            if person_locations:
+                print(f"   Locations: {person_locations}")
+            if organization_num_employees_ranges:
+                print(f"   Company size: {organization_num_employees_ranges}")
+
+            # Use correct Apollo API endpoint
+            url = f"{self.base_url}/api/v1/mixed_people/search"
+
+            payload = {
+                'page': page,
+                'per_page': min(per_page, 100)  # Apollo max is 100
+            }
+            
+            # Add filters
+            if person_titles:
+                payload['person_titles'] = person_titles
+            if person_locations:
+                payload['person_locations'] = person_locations
+            if organization_num_employees_ranges:
+                payload['organization_num_employees_ranges'] = organization_num_employees_ranges
+            if person_seniorities:
+                payload['person_seniorities'] = person_seniorities
+            if organization_industry_tag_ids:
+                payload['organization_industry_tag_ids'] = organization_industry_tag_ids
+
+            response = requests.post(url, json=payload, headers=self.headers)
+            response.raise_for_status()
+            data = response.json()
+
+            contacts = []
+            if data.get('people'):
+                print(f"   Found {len(data['people'])} contacts")
+                for person in data['people']:
+                    # Extract organization info properly - it's always in nested 'organization' object
+                    org = person.get('organization', {})
+                    if not org:
+                        org = {}
+                    
+                    org_name = org.get('name', '')
+                    org_domain = org.get('primary_domain', '')
+                    
+                    contact = {
+                        'id': person.get('id', ''),
+                        'name': person.get('name', ''),
+                        'first_name': person.get('first_name', ''),
+                        'last_name': person.get('last_name', ''),
+                        'title': person.get('title', ''),
+                        'email': person.get('email', ''),
+                        'email_status': person.get('email_status', ''),
+                        'phone_numbers': person.get('phone_numbers', []),
+                        'linkedin_url': person.get('linkedin_url', ''),
+                        'organization_name': org_name,  # From nested organization.name
+                        'organization_id': person.get('organization_id', ''),
+                        'organization': org,
+                        'organization_domain': org_domain,  # Add domain for easy access
+                        'city': person.get('city', ''),
+                        'state': person.get('state', ''),
+                        'country': person.get('country', ''),
+                        'seniority': person.get('seniority', ''),
+                        'departments': person.get('departments', [])
+                    }
+                    contacts.append(contact)
+            else:
+                print(f"   No people found in response")
+
+            return contacts
+
+        except Exception as e:
+            print(f"[ERROR] Error searching people: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return []
+
     def find_contacts_by_role(self, domain: str, role_type: str = 'all', per_page: int = 10, reveal_emails: bool = True) -> List[Dict]:
         """
         Find contacts by role type (convenience method)
@@ -368,7 +465,7 @@ class ApolloAPIService:
         Returns list of {person_id, email, success} dicts
         """
         results = []
-        print(f"\n🔐 Revealing emails for {len(person_ids)} contacts...")
+        print(f"\n[LOCK] Revealing emails for {len(person_ids)} contacts...")
         
         for i, person_id in enumerate(person_ids, 1):
             print(f"   [{i}/{len(person_ids)}] Processing {person_id}...")
@@ -380,7 +477,7 @@ class ApolloAPIService:
             })
         
         success_count = sum(1 for r in results if r['success'])
-        print(f"\n✅ Revealed {success_count}/{len(person_ids)} emails")
+        print(f"\n[OK] Revealed {success_count}/{len(person_ids)} emails")
         return results
 
     def reveal_email(self, person_id: str) -> Optional[str]:
@@ -397,7 +494,7 @@ class ApolloAPIService:
         - pending_manual_fulfillment: Being manually researched
         """
         try:
-            print(f"🔐 Revealing email for person ID: {person_id}")
+            print(f"[LOCK] Revealing email for person ID: {person_id}")
 
             # Apollo People Enrichment endpoint - note the /api/v1 path
             url = f"{self.base_url}/api/v1/people/match"
@@ -417,7 +514,7 @@ class ApolloAPIService:
             email_status = person.get('email_status', '')
             
             if email:
-                print(f"✅ Email revealed: {email} (status: {email_status})")
+                print(f"[OK] Email revealed: {email} (status: {email_status})")
                 return email
             
             # Explain why email wasn't found
@@ -429,11 +526,11 @@ class ApolloAPIService:
                 '': 'No email status returned'
             }
             explanation = status_explanations.get(email_status, f'Status: {email_status}')
-            print(f"⚠️ No email found - {explanation}")
+            print(f"[WARN] No email found - {explanation}")
             return None
 
         except Exception as e:
-            print(f"❌ Error revealing email for person {person_id}: {str(e)}")
+            print(f"[ERROR] Error revealing email for person {person_id}: {str(e)}")
             return None
 
     def enrich_person(self, person_id: str = None, first_name: str = None, last_name: str = None,
@@ -457,7 +554,7 @@ class ApolloAPIService:
         - pending_manual_fulfillment: Being manually researched
         """
         try:
-            print(f"\n🔍 Calling Apollo POST /api/v1/people/match endpoint...")
+            print(f"\n[SEARCH] Calling Apollo POST /api/v1/people/match endpoint...")
             print(f"   Person ID: {person_id}")
             print(f"   Reveal Personal Emails: {reveal_emails}")
 
@@ -519,10 +616,10 @@ class ApolloAPIService:
                 # Explain email status if no email
                 if not email_value and email_status:
                     status_explanations = {
-                        'unavailable': '⚠️ Apollo does not have this email in their database',
-                        'bounced': '⚠️ This email previously bounced and is marked invalid',
-                        'pending_manual_fulfillment': '⏳ Email is being manually researched by Apollo',
-                        'gdpr_restricted': '🔒 Person is in a GDPR-protected region (EU) - email not disclosed'
+                        'unavailable': '[WARN] Apollo does not have this email in their database',
+                        'bounced': '[WARN] This email previously bounced and is marked invalid',
+                        'pending_manual_fulfillment': '[WAIT] Email is being manually researched by Apollo',
+                        'gdpr_restricted': '[LOCK] Person is in a GDPR-protected region (EU) - email not disclosed'
                     }
                     explanation = status_explanations.get(email_status, f'Status: {email_status}')
                     print(f"   {explanation}")
@@ -573,25 +670,25 @@ class ApolloAPIService:
                             org_domain
                         )
                         enriched_person['guessed_emails'] = guessed_emails
-                        print(f"   💡 Suggested work email patterns: {', '.join(guessed_emails[:3])}")
+                        print(f"   [TIP] Suggested work email patterns: {', '.join(guessed_emails[:3])}")
 
-                print(f"✅ Enriched: {enriched_person['name']} ({enriched_person['title']})")
+                print(f"[OK] Enriched: {enriched_person['name']} ({enriched_person['title']})")
                 if enriched_person['email']:
-                    print(f"📧 Email revealed: {enriched_person['email']} (status: {enriched_person['email_status']})")
+                    print(f"[EMAIL] Email revealed: {enriched_person['email']} (status: {enriched_person['email_status']})")
                 else:
-                    print(f"⚠️ No email returned by Apollo - status: {email_status}")
+                    print(f"[WARN] No email returned by Apollo - status: {email_status}")
 
                 return enriched_person
 
-            print(f"⚠️ No person data in Apollo response")
+            print(f"[WARN] No person data in Apollo response")
             return None
 
         except requests.exceptions.HTTPError as e:
-            print(f"❌ HTTP Error from Apollo: {e}")
+            print(f"[ERROR] HTTP Error from Apollo: {e}")
             print(f"   Response: {e.response.text if e.response else 'No response'}")
             return None
         except Exception as e:
-            print(f"❌ Error enriching person: {str(e)}")
+            print(f"[ERROR] Error enriching person: {str(e)}")
             import traceback
             traceback.print_exc()
             return None
