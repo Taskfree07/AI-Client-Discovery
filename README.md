@@ -24,70 +24,112 @@ A professional, automated recruitment platform that finds job openings, identifi
 - Microsoft Entra ID (Azure AD) application credentials
 - Google Cloud credentials for Sheets API
 
-### Installation
+### Installation & Setup
 
-1. **Clone or navigate to the project directory:**
-   ```bash
-   cd "E:\Techgene\AI Client Discovery"
-   ```
+Follow these steps to run the application from scratch:
 
-2. **Create a virtual environment:**
-   ```bash
-   python -m venv venv
-   ```
+#### Step 1: Navigate to Project Directory
+```bash
+cd "E:\Techgene\AI Client Discovery"
+```
 
-3. **Activate the virtual environment:**
-   - Windows:
-     ```bash
-     venv\Scripts\activate
-     ```
-   - Linux/Mac:
-     ```bash
-     source venv/bin/activate
-     ```
+#### Step 2: Create Virtual Environment
+```bash
+python -m venv venv
+```
 
-4. **Install dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
+#### Step 3: Activate Virtual Environment
 
-5. **Create environment file:**
-   ```bash
-   copy .env.example .env
-   ```
+**Windows (PowerShell):**
+```powershell
+.\venv\Scripts\Activate.ps1
+```
 
-6. **Edit `.env` file with your credentials** (or configure later in the Settings page)
+**Windows (Command Prompt):**
+```bash
+venv\Scripts\activate
+```
 
-### Running the Application
+**Linux/Mac:**
+```bash
+source venv/bin/activate
+```
 
-#### Option 1: Quick Start (Windows - Recommended)
-Simply double-click or run:
+#### Step 4: Install Dependencies
+```bash
+pip install -r requirements.txt
+```
+
+This will install all required packages including:
+- Flask and web framework dependencies
+- SQLAlchemy for database management
+- AI/ML libraries (sentence-transformers, faiss, torch, scikit-learn)
+- Google APIs, Apollo API, and Microsoft Graph API clients
+- And more...
+
+Installation may take several minutes as it downloads large ML models.
+
+#### Step 5: Configure Environment (Optional)
+```bash
+# Windows
+copy .env.example .env
+
+# Linux/Mac
+cp .env.example .env
+```
+
+Edit the `.env` file with your API credentials, or configure them later in the Settings page.
+
+#### Step 6: Run the Application
+
+**Standard Run:**
+```bash
+python app.py
+```
+
+**With Realtime Logs (Recommended for debugging):**
+
+Windows (Command Prompt):
+```bash
+python -u app.py
+```
+
+Windows (PowerShell - save logs to file):
+```powershell
+python app.py | Tee-Object -FilePath logs/app.log
+```
+
+Linux/Mac (save logs to file):
+```bash
+python -u app.py 2>&1 | tee logs/app.log
+```
+
+The `-u` flag enables unbuffered output for immediate log display.
+
+#### Step 7: Access the Application
+
+Once the server starts, you'll see:
+```
+* Running on http://127.0.0.1:5000
+```
+
+Open your browser and navigate to:
+```
+http://localhost:5000
+```
+
+Configure your API keys in the Settings page to start using the platform.
+
+---
+
+### Quick Start (Automated - Windows Only)
+
+If `run.bat` exists, simply double-click it or run:
 ```bash
 run.bat
 ```
-This will automatically:
-- Create and activate the virtual environment
-- Install all dependencies
-- Start the Flask server
 
-#### Option 2: Manual Start
-1. **Activate the virtual environment:**
-   ```bash
-   venv\Scripts\activate
-   ```
-
-2. **Start the Flask server:**
-   ```bash
-   python app.py
-   ```
-
-#### Access the Application
-1. **Open your browser and navigate to:**
-   ```
-   http://localhost:5000
-   ```
-
-2. **Configure your API keys in the Settings page**
+This will automatically create the virtual environment, install dependencies, and start the server.
 
 ## ⚙️ Configuration
 

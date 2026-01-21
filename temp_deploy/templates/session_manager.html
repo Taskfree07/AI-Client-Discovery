@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Session Manager - Jobs Pipeline</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/jobs_pipeline.css') }}">
+    <style>
+        /* Session Manager specific styles */
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 24px;
+            padding: 0 0 20px 0;
+            border-bottom: 1px solid var(--border-light);
+        }
+        .page-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--text-dark);
+            margin-bottom: 4px;
+        }
+        .page-subtitle {
+            color: var(--text-light);
+            font-size: 14px;
+        }
+        .add-session-btn {
+            background: var(--primary-blue);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .add-session-btn:hover {
+            background: var(--primary-dark);
+        }
+        .filter-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+        }
+        .filter-tab {
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            background: transparent;
+            color: var(--text-medium);
+            transition: all 0.2s;
+        }
+        .filter-tab:hover {
+            background: var(--bg-light);
+        }
+        .filter-tab.active {
+            background: var(--primary-blue);
+            color: white;
+        }
+        .sessions-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .session-card {
+            background: white;
+            border: 1px solid var(--border-light);
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s ease;
+        }
+        .session-card:hover {
+            box-shadow: var(--shadow-md);
+            border-color: var(--border-medium);
+        }
+        .session-info {
+            flex: 1;
+        }
+        .session-name {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-dark);
+            margin-bottom: 4px;
+        }
+        .session-date {
+            color: var(--text-light);
+            font-size: 13px;
+        }
+        .session-meta {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-top: 8px;
+        }
+        .lead-count {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--text-medium);
+            font-size: 14px;
+        }
+        .lead-count svg {
+            color: #f59e0b;
+        }
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+            text-transform: capitalize;
+        }
+        .status-ready {
+            background: #d1fae5;
+            color: #059669;
+        }
+        .status-processing {
+            background: #fef3c7;
+            color: #d97706;
+        }
+        .status-sent {
+            background: #dbeafe;
+            color: #2563eb;
+        }
+        .status-draft {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+        .status-archived {
+            background: #f3f4f6;
+            color: #6b7280;
+        }
+        .session-updated {
+            color: var(--text-light);
+            font-size: 13px;
+            margin-top: 4px;
+        }
+        .session-actions {
+            display: flex;
+            gap: 10px;
+        }
+        .session-action {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 14px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid var(--border-light);
+            background: white;
+            color: var(--text-medium);
+            text-decoration: none;
+        }
+        .session-action:hover {
+            background: var(--bg-light);
+            border-color: var(--border-medium);
+        }
+        .session-action svg {
+            width: 16px;
+            height: 16px;
+        }
+        .session-action.primary {
+            background: var(--primary-blue);
+            color: white;
+            border-color: var(--primary-blue);
+        }
+        .session-action.primary:hover {
+            background: var(--primary-dark);
+            border-color: var(--primary-dark);
+        }
+        .session-action.edit {
+            background: #f0f9ff;
+            color: #0369a1;
+            border-color: #bae6fd;
+        }
+        .session-action.edit:hover {
+            background: #e0f2fe;
+            border-color: #7dd3fc;
+        }
+        .session-action.archive {
+            background: #fef3c7;
+            color: #92400e;
+            border-color: #fde68a;
+        }
+        .session-action.archive:hover {
+            background: #fef08a;
+            border-color: #fcd34d;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-light);
+        }
+        .empty-state svg {
+            width: 64px;
+            height: 64px;
+            color: var(--border-medium);
+            margin-bottom: 16px;
+        }
+        .empty-state h3 {
+            color: var(--text-dark);
+            margin-bottom: 8px;
+        }
+        /* Modal styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .modal-overlay.show {
+            display: flex;
+        }
+        .session-modal-content {
+            background: white;
+            border-radius: 12px;
+            width: 100%;
+            max-width: 500px;
+            box-shadow: var(--shadow-lg);
+        }
+        .session-modal-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border-light);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .session-modal-header h3 {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-dark);
+            margin: 0;
+        }
+        .session-modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            color: var(--text-light);
+            cursor: pointer;
+            line-height: 1;
+        }
+        .session-modal-body {
+            padding: 24px;
+        }
+        .form-group {
+            margin-bottom: 16px;
+        }
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-dark);
+            margin-bottom: 6px;
+        }
+        .form-input, .form-select {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+            box-sizing: border-box;
+        }
+        .form-input:focus, .form-select:focus {
+            outline: none;
+            border-color: var(--primary-blue);
+        }
+        .session-modal-footer {
+            padding: 16px 24px;
+            border-top: 1px solid var(--border-light);
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+        }
+        .btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-secondary {
+            background: var(--bg-light);
+            border: 1px solid var(--border-light);
+            color: var(--text-medium);
+        }
+        .btn-secondary:hover {
+            background: var(--border-light);
+        }
+        .btn-primary {
+            background: var(--primary-blue);
+            border: none;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: var(--primary-dark);
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-logo">
+            <div class="header-logo-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
+                </svg>
+            </div>
+            <span class="header-title">Jobs Pipeline</span>
+            <span class="header-subtitle">powered by Techgene</span>
+        </div>
+        <div class="header-actions">
+            <button class="header-btn" title="Settings">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <div class="app-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <button class="sidebar-toggle" onclick="toggleSidebar()" title="Menu">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="3" y1="12" x2="21" y2="12"/>
+                        <line x1="3" y1="6" x2="21" y2="6"/>
+                        <line x1="3" y1="18" x2="21" y2="18"/>
+                    </svg>
+                </button>
+            </div>
+
+            <nav class="sidebar-nav">
+                <a href="/dashboard" class="nav-item">
+                    <span class="nav-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="7" height="9"/>
+                            <rect x="14" y="3" width="7" height="5"/>
+                            <rect x="14" y="12" width="7" height="9"/>
+                            <rect x="3" y="16" width="7" height="5"/>
+                        </svg>
+                    </span>
+                    <span class="nav-text">Dashboard</span>
+                </a>
+
+                <!-- Lead Engine with submenu -->
+                <div class="nav-group expanded">
+                    <div class="nav-item nav-group-header" onclick="toggleNavGroup(this)">
+                        <span class="nav-icon">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="3"/>
+                                <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4"/>
+                            </svg>
+                        </span>
+                        <span class="nav-text">Lead Engine</span>
+                        <span class="nav-arrow">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"/>
+                            </svg>
+                        </span>
+                    </div>
+                    <div class="nav-submenu">
+                        <a href="/lead-engine" class="nav-subitem">
+                            <span class="nav-text">Lead Search</span>
+                        </a>
+                        <a href="/session-manager" class="nav-subitem active">
+                            <span class="nav-text">Session Manager</span>
+                        </a>
+                    </div>
+                </div>
+
+                <a href="/campaign-manager" class="nav-item">
+                    <span class="nav-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                            <circle cx="9" cy="7" r="4"/>
+                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                        </svg>
+                    </span>
+                    <span class="nav-text">Campaign Manager</span>
+                </a>
+
+                <a href="/response-manager" class="nav-item">
+                    <span class="nav-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                        </svg>
+                    </span>
+                    <span class="nav-text">Response Manager</span>
+                </a>
+
+                <a href="/analytics" class="nav-item">
+                    <span class="nav-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="20" x2="18" y2="10"/>
+                            <line x1="12" y1="20" x2="12" y2="4"/>
+                            <line x1="6" y1="20" x2="6" y2="14"/>
+                        </svg>
+                    </span>
+                    <span class="nav-text">Analytics</span>
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content" id="main-content">
+            <!-- Page Header -->
+            <div class="page-header">
+                <div>
+                    <h1 class="page-title">Session Manager</h1>
+                    <p class="page-subtitle">Manage and resume your lead generation sessions</p>
+                </div>
+                <button class="add-session-btn" onclick="openNewSessionModal()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="12" y1="5" x2="12" y2="19"/>
+                        <line x1="5" y1="12" x2="19" y2="12"/>
+                    </svg>
+                    Add New Session
+                </button>
+            </div>
+
+            <!-- Filter Tabs -->
+            <div class="filter-tabs">
+                <button class="filter-tab active" data-filter="all" onclick="filterByTab('all')">All</button>
+                <button class="filter-tab" data-filter="today" onclick="filterByTab('today')">Today</button>
+                <button class="filter-tab" data-filter="week" onclick="filterByTab('week')">This Week</button>
+                <button class="filter-tab" data-filter="month" onclick="filterByTab('month')">This Month</button>
+            </div>
+
+            <!-- Sessions List -->
+            <div class="sessions-list" id="sessionsList">
+                <!-- Sessions will be loaded here -->
+            </div>
+
+            <!-- Empty State -->
+            <div class="empty-state" id="emptyState" style="display: none;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M9 12h6M12 9v6M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <h3>No sessions yet</h3>
+                <p>Start a new lead search to create your first session</p>
+                <button class="add-session-btn" style="margin-top: 16px;" onclick="window.location.href='/lead-engine'">
+                    Go to Lead Search
+                </button>
+            </div>
+        </main>
+    </div>
+
+    <!-- New Session Modal -->
+    <div class="modal-overlay" id="newSessionModal">
+        <div class="session-modal-content">
+            <div class="session-modal-header">
+                <h3>Create New Session</h3>
+                <button class="session-modal-close" onclick="closeNewSessionModal()">&times;</button>
+            </div>
+            <div class="session-modal-body">
+                <div class="form-group">
+                    <label class="form-label">Session Name</label>
+                    <input type="text" class="form-input" id="sessionName" placeholder="e.g., Data Engineer - January 2026">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Job Titles (comma separated)</label>
+                    <input type="text" class="form-input" id="sessionJobTitles" placeholder="e.g., Data Engineer, ML Engineer">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Locations (optional, comma separated)</label>
+                    <input type="text" class="form-input" id="sessionLocations" placeholder="e.g., USA, India">
+                </div>
+            </div>
+            <div class="session-modal-footer">
+                <button class="btn btn-secondary" onclick="closeNewSessionModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="createSession()">Create Session</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Session Modal -->
+    <div class="modal-overlay" id="editSessionModal">
+        <div class="session-modal-content">
+            <div class="session-modal-header">
+                <h3>Edit Session</h3>
+                <button class="session-modal-close" onclick="closeEditSessionModal()">&times;</button>
+            </div>
+            <div class="session-modal-body">
+                <input type="hidden" id="editSessionId">
+                <div class="form-group">
+                    <label class="form-label">Session Name</label>
+                    <input type="text" class="form-input" id="editSessionName">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Status</label>
+                    <select class="form-select" id="editSessionStatus">
+                        <option value="draft">Draft</option>
+                        <option value="processing">Processing</option>
+                        <option value="ready">Ready</option>
+                        <option value="sent">Sent</option>
+                    </select>
+                </div>
+            </div>
+            <div class="session-modal-footer">
+                <button class="btn btn-secondary" onclick="closeEditSessionModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="updateSession()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+    <script>
+        // State
+        let sessions = [];
+        let currentFilter = 'all';
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadSessions();
+        });
+
+        // Toggle sidebar
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('collapsed');
+            document.body.classList.toggle('sidebar-collapsed');
+        }
+
+        // Toggle nav group
+        function toggleNavGroup(element) {
+            const navGroup = element.closest('.nav-group');
+            if (navGroup) {
+                navGroup.classList.toggle('expanded');
+            }
+        }
+
+        // Filter tabs
+        function filterByTab(filter) {
+            currentFilter = filter;
+            document.querySelectorAll('.filter-tab').forEach(tab => {
+                tab.classList.toggle('active', tab.dataset.filter === filter);
+            });
+            renderSessions();
+        }
+
+        // Load sessions from API
+        async function loadSessions() {
+            try {
+                const response = await fetch('/api/sessions');
+                const data = await response.json();
+                sessions = data.sessions || [];
+                renderSessions();
+            } catch (error) {
+                console.error('Error loading sessions:', error);
+            }
+        }
+
+        // Filter sessions by date
+        function filterSessionsByDate(sessionList) {
+            const now = new Date();
+            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+            const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+            return sessionList.filter(session => {
+                const created = new Date(session.created_at);
+
+                switch (currentFilter) {
+                    case 'today':
+                        return created >= today;
+                    case 'week':
+                        return created >= weekAgo;
+                    case 'month':
+                        return created >= monthAgo;
+                    default:
+                        return true;
+                }
+            });
+        }
+
+        // Render sessions list
+        function renderSessions() {
+            const container = document.getElementById('sessionsList');
+            const emptyState = document.getElementById('emptyState');
+            const filtered = filterSessionsByDate(sessions);
+
+            if (filtered.length === 0) {
+                emptyState.style.display = 'block';
+                container.innerHTML = '';
+                return;
+            }
+
+            emptyState.style.display = 'none';
+            container.innerHTML = filtered.map(session => createSessionCard(session)).join('');
+        }
+
+        // Create session card HTML
+        function createSessionCard(session) {
+            const createdDate = new Date(session.created_at);
+            const formattedDate = createdDate.toLocaleDateString('en-GB', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            });
+            const updatedDate = new Date(session.updated_at);
+            const updatedText = formatRelativeTime(updatedDate);
+
+            return `
+                <div class="session-card" data-session-id="${session.id}">
+                    <div class="session-info">
+                        <div class="session-name">${escapeHtml(session.name)}</div>
+                        <div class="session-date">Created on ${formattedDate}</div>
+                        <div class="session-meta">
+                            <div class="lead-count">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                                    <circle cx="9" cy="7" r="4"/>
+                                </svg>
+                                <span>${session.total_leads} leads</span>
+                            </div>
+                            <div class="lead-count">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                                    <circle cx="9" cy="7" r="4"/>
+                                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                                    <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                                </svg>
+                                <span>${session.total_pocs || 0} POCs</span>
+                            </div>
+                            <span class="status-badge status-${session.status}">${session.status}</span>
+                        </div>
+                        <div class="session-updated">Updated ${updatedText}</div>
+                    </div>
+                    <div class="session-actions">
+                        <button class="session-action primary" onclick="openSession(${session.id})" title="Open Session">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                                <polyline points="15 3 21 3 21 9"/>
+                                <line x1="10" y1="14" x2="21" y2="3"/>
+                            </svg>
+                            Open
+                        </button>
+                        <button class="session-action edit" onclick="editSession(${session.id})" title="Edit">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                            </svg>
+                            Edit
+                        </button>
+                        <button class="session-action archive" onclick="archiveSession(${session.id})" title="Archive">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="21 8 21 21 3 21 3 8"/>
+                                <rect x="1" y="3" width="22" height="5"/>
+                                <line x1="10" y1="12" x2="14" y2="12"/>
+                            </svg>
+                            Archive
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Format relative time
+        function formatRelativeTime(date) {
+            const now = new Date();
+            const diff = now - date;
+            const minutes = Math.floor(diff / 60000);
+            const hours = Math.floor(diff / 3600000);
+            const days = Math.floor(diff / 86400000);
+
+            if (minutes < 1) return 'Just now';
+            if (minutes < 60) return `${minutes} minutes ago`;
+            if (hours < 24) return `${hours} hours ago`;
+            if (days === 0) return 'Today';
+            if (days === 1) return 'Yesterday';
+            return `${days} days ago`;
+        }
+
+        // Escape HTML
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Open new session modal
+        function openNewSessionModal() {
+            document.getElementById('sessionName').value = '';
+            document.getElementById('sessionJobTitles').value = '';
+            document.getElementById('sessionLocations').value = '';
+            document.getElementById('newSessionModal').classList.add('show');
+        }
+
+        // Close new session modal
+        function closeNewSessionModal() {
+            document.getElementById('newSessionModal').classList.remove('show');
+        }
+
+        // Open edit session modal
+        function editSession(sessionId) {
+            const session = sessions.find(s => s.id === sessionId);
+            if (!session) return;
+
+            document.getElementById('editSessionId').value = sessionId;
+            document.getElementById('editSessionName').value = session.name;
+            document.getElementById('editSessionStatus').value = session.status;
+            document.getElementById('editSessionModal').classList.add('show');
+        }
+
+        // Close edit session modal
+        function closeEditSessionModal() {
+            document.getElementById('editSessionModal').classList.remove('show');
+        }
+
+        // Create new session
+        async function createSession() {
+            const name = document.getElementById('sessionName').value.trim();
+            const jobTitles = document.getElementById('sessionJobTitles').value.trim();
+            const locations = document.getElementById('sessionLocations').value.trim();
+
+            if (!name) {
+                alert('Please enter a session name');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/sessions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: name,
+                        job_titles: jobTitles ? jobTitles.split(',').map(t => t.trim()) : [],
+                        locations: locations ? locations.split(',').map(l => l.trim()) : []
+                    })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    closeNewSessionModal();
+                    loadSessions();
+                } else {
+                    alert('Error creating session: ' + data.error);
+                }
+            } catch (error) {
+                alert('Error creating session');
+                console.error(error);
+            }
+        }
+
+        // Open session (redirect to Session Detail page)
+        function openSession(sessionId) {
+            window.location.href = `/session/${sessionId}`;
+        }
+
+        // Update session
+        async function updateSession() {
+            const sessionId = document.getElementById('editSessionId').value;
+            const name = document.getElementById('editSessionName').value.trim();
+            const status = document.getElementById('editSessionStatus').value;
+
+            try {
+                const response = await fetch(`/api/sessions/${sessionId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, status })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    closeEditSessionModal();
+                    loadSessions();
+                } else {
+                    alert('Error updating session: ' + data.error);
+                }
+            } catch (error) {
+                alert('Error updating session');
+                console.error(error);
+            }
+        }
+
+        // Archive session
+        async function archiveSession(sessionId) {
+            if (!confirm('Are you sure you want to archive this session?')) return;
+
+            try {
+                const response = await fetch(`/api/sessions/${sessionId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: 'archived' })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    loadSessions();
+                } else {
+                    alert('Error archiving session: ' + data.error);
+                }
+            } catch (error) {
+                alert('Error archiving session');
+                console.error(error);
+            }
+        }
+
+        // Close modals on backdrop click
+        document.querySelectorAll('.modal-overlay').forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.classList.remove('show');
+                }
+            });
+        });
+    </script>
+</body>
+</html>

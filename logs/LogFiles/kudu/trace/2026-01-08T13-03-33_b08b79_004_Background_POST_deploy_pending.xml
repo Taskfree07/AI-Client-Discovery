@@ -1,0 +1,33 @@
+<step title="BackgroundTrace" date="2026-01-08T13:03:33.756" instance="b08b79" url="/deploy" method="POST" >
+  <step title="Creating temporary deployment - FetchDeploymentManager" date="2026-01-08T13:03:34.339" /><!-- duration: 8ms -->
+  <step title="Creating temporary deployment" date="2026-01-08T13:03:34.356" /><!-- duration: 130ms -->
+  <step title="Performing fetch based deployment" date="2026-01-08T13:03:35.672" >
+    <step title="Deployment timer started" date="2026-01-08T13:03:46.529" >
+      <step title="DeploymentManager.Deploy(id:0db150e05b7a943bb894486343ec15ff9c20b057)" date="2026-01-08T13:03:46.539" >
+        <step title="Collecting changeset information" date="2026-01-08T13:03:46.612" /><!-- duration: 633ms -->
+        <step title="Updating submodules" date="2026-01-08T13:03:47.256" /><!-- duration: 1334ms -->
+        <step title="Determining deployment builder" date="2026-01-08T13:03:49.275" >
+          <step title="Builder is OryxBuilder" date="2026-01-08T13:03:49.315" /><!-- duration: 22ms -->
+        </step><!-- duration: 80ms -->
+        <step title="PreDeployment: context.CleanOutputPath False" date="2026-01-08T13:03:49.436" >
+          <step title="PreDeployment: context.OutputPath /home/site/wwwroot" date="2026-01-08T13:03:49.669" >
+            <step title="Building" date="2026-01-08T13:03:49.959" >
+              <step title="Executing external process" date="2026-01-08T13:03:50.461" type="process" path="bash" arguments="-c &quot;oryx build /home/site/repository -o /home/site/wwwroot --platform python --platform-version 3.11 -p virtualenv_name=antenv --log-file /tmp/build-debug.log  -i /tmp/8de4eb65d8bf790 --compress-destination-dir | tee /tmp/oryx-build.log ; exit $PIPESTATUS &quot;" >
+                <step title="Cpu: python(957,36.470s)+ts(958,0.150s)+build.sh(956,0.000s)+build.sh(955,0.000s)+build.sh(857,0.090s)+oryx(836,7.020s)+tee(837,0.000s)+bash(835,0.000s)=total(43.730s)" date="2026-01-08T13:05:55.146" /><!-- duration: 19ms -->
+                <step title="bash: no io activity for 60s, prev-cpu=-1.000s, current-cpu=43.730s" date="2026-01-08T13:05:55.183" /><!-- duration: 32ms -->
+                <step title="Cpu: python(957,71.490s)+ts(958,0.160s)+build.sh(956,0.000s)+build.sh(955,0.000s)+build.sh(857,0.090s)+oryx(836,7.130s)+tee(837,0.000s)+bash(835,0.000s)=total(78.870s)" date="2026-01-08T13:06:55.810" /><!-- duration: 20ms -->
+                <step title="bash: no io activity for 121s, prev-cpu=43.730s, current-cpu=78.870s" date="2026-01-08T13:06:55.878" /><!-- duration: 17ms -->
+                <step title="Cpu: python(957,87.210s)+ts(958,0.160s)+build.sh(956,0.000s)+build.sh(955,0.000s)+build.sh(857,0.090s)+oryx(836,7.300s)+tee(837,0.000s)+bash(835,0.000s)=total(94.760s)" date="2026-01-08T13:07:57.430" /><!-- duration: 30ms -->
+                <step title="bash: no io activity for 182s, prev-cpu=78.870s, current-cpu=94.760s" date="2026-01-08T13:07:57.490" /><!-- duration: 61ms -->
+                <step title="Cpu: python(957,116.050s)+ts(958,0.160s)+build.sh(956,0.000s)+build.sh(955,0.000s)+build.sh(857,0.100s)+oryx(836,7.440s)+tee(837,0.000s)+bash(835,0.000s)=total(123.740s)" date="2026-01-08T13:08:58.132" /><!-- duration: 71ms -->
+                <step title="bash: no io activity for 243s, prev-cpu=94.760s, current-cpu=123.740s" date="2026-01-08T13:08:58.233" /><!-- duration: 20ms -->
+                <step title="Cpu: python(957,147.860s)+ts(958,0.170s)+build.sh(956,0.000s)+build.sh(955,0.000s)+build.sh(857,0.100s)+oryx(836,7.510s)+tee(837,0.000s)+bash(835,0.000s)=total(155.630s)" date="2026-01-08T13:09:58.681" /><!-- duration: 20ms -->
+                <step title="bash: no io activity for 304s, prev-cpu=123.740s, current-cpu=155.630s" date="2026-01-08T13:09:58.731" /><!-- duration: 58ms -->
+                <step title="Cpu: python(957,185.790s)+ts(958,0.200s)+build.sh(956,0.000s)+build.sh(955,0.000s)+build.sh(857,0.100s)+oryx(836,7.580s)+tee(837,0.000s)+bash(835,0.000s)=total(193.670s)" date="2026-01-08T13:10:59.121" /><!-- duration: 28ms -->
+                <step title="bash: no io activity for 364s, prev-cpu=155.630s, current-cpu=193.670s" date="2026-01-08T13:10:59.163" /><!-- duration: 38ms -->
+                <step title="Cpu: python(957,220.440s)+ts(958,0.210s)+build.sh(956,0.000s)+build.sh(955,0.000s)+build.sh(857,0.100s)+oryx(836,7.670s)+tee(837,0.000s)+bash(835,0.000s)=total(228.420s)" date="2026-01-08T13:11:59.694" /><!-- duration: 29ms -->
+                <step title="bash: no io activity for 425s, prev-cpu=193.670s, current-cpu=228.420s" date="2026-01-08T13:11:59.753" /><!-- duration: 59ms -->
+                <step title="Cpu: python(957,227.440s)+ts(958,0.210s)+build.sh(956,0.000s)+build.sh(955,0.000s)+build.sh(857,0.100s)+oryx(836,7.720s)+tee(837,0.000s)+bash(835,0.000s)=total(235.470s)" date="2026-01-08T13:13:00.472" /><!-- duration: 89ms -->
+                <step title="bash: no io activity for 485s, prev-cpu=228.420s, current-cpu=235.470s" date="2026-01-08T13:13:00.838" /><!-- duration: 154ms -->
+                <step title="Cpu: python(957,241.090s)+ts(958,0.210s)+build.sh(956,0.000s)+build.sh(955,0.000s)+build.sh(857,0.100s)+oryx(836,7.850s)+tee(837,0.000s)+bash(835,0.000s)=total(249.240s)" date="2026-01-08T13:14:02.991" /><!-- duration: 20ms -->
+                <step title="bash: no io activity for 547s, prev-cpu=235.470s, current-cpu=249.240s" date="2026-01-08T13:14:03.167" /><!-- duration: 128ms -->

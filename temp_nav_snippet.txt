@@ -1,0 +1,15 @@
+This is a temporary file to help plan the navigation updates.
+
+For manufacturing_icp.html, pipeline.html, and settings.html:
+
+These files use the older style.css based navigation with:
+- <ul class="nav-menu">
+- <li class="nav-item">
+- <a class="nav-link">
+
+They need:
+1. CSS added for .nav-group, .nav-group-header, .nav-arrow, .nav-submenu
+2. HTML sidebar updated with collapsible Lead Engine group
+3. JavaScript toggleNavGroup function added
+
+The navigation should match the new collapsible structure but work within their existing CSS framework.

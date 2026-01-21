@@ -1,0 +1,1049 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Session Details - Jobs Pipeline</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/jobs_pipeline.css') }}">
+    <style>
+        body {
+            background-color: #f8fafc;
+            color: #334155;
+            line-height: 1.5;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+            opacity: 1;
+            transition: none;
+        }
+
+        /* Prevent flicker on page load */
+        body.loading {
+            opacity: 0;
+        }
+
+        /* ===== TOP NAVBAR ===== */
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            contain: layout style paint;
+        }
+
+        /* ===== MAIN LAYOUT ===== */
+        .main-wrapper,
+        .app-layout {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+            position: relative;
+            margin-top: 64px;
+        }
+
+        /* Anti-flicker: Ensure instant layout */
+        .header,
+        .sidebar,
+        .main-content {
+            will-change: auto;
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+            transform: translateZ(0);
+            -webkit-transform: translateZ(0);
+            contain: layout style;
+        }
+
+        /* ===== SIDEBAR ===== */
+        .sidebar {
+            position: fixed;
+            top: 64px;
+            left: 0;
+            bottom: 0;
+            z-index: 900;
+        }
+
+        /* ===== MAIN CONTENT ===== */
+        .main-content {
+            margin-left: 240px;
+        }
+
+        .session-detail-header {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: var(--shadow-sm);
+        }
+        .session-title-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 20px;
+        }
+        .session-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--text-dark);
+            margin-bottom: 4px;
+        }
+        .session-meta {
+            color: var(--text-light);
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .session-actions-top {
+            display: flex;
+            gap: 12px;
+        }
+        .stats-row {
+            display: flex;
+            gap: 24px;
+            padding: 16px 0;
+            border-top: 1px solid var(--border-light);
+            border-bottom: 1px solid var(--border-light);
+            margin-bottom: 16px;
+        }
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .stat-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .stat-icon svg {
+            width: 22px;
+            height: 22px;
+        }
+        .stat-icon.leads { background: #dbeafe; color: #2563eb; }
+        .stat-icon.pocs { background: #d1fae5; color: #059669; }
+        .stat-icon.emails { background: #fef3c7; color: #d97706; }
+        .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--text-dark);
+        }
+        .stat-label {
+            font-size: 13px;
+            color: var(--text-light);
+        }
+        .filters-row {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+        .filter-tag {
+            background: var(--bg-light);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            color: var(--text-medium);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .filter-tag svg {
+            width: 14px;
+            height: 14px;
+            color: var(--text-light);
+        }
+        .status-badge {
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+        .status-ready { background: #d1fae5; color: #059669; }
+        .status-processing { background: #fef3c7; color: #d97706; }
+        .status-sent { background: #dbeafe; color: #2563eb; }
+        .status-draft { background: #fee2e2; color: #dc2626; }
+
+        /* Leads Table */
+        .leads-section {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        .leads-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .leads-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #111827;
+        }
+        .leads-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+        .leads-table th {
+            background: #f9fafb;
+            padding: 12px 16px;
+            text-align: left;
+            font-size: 12px;
+            font-weight: 600;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .leads-table td {
+            padding: 16px;
+            border-bottom: 1px solid #f3f4f6;
+            vertical-align: top;
+        }
+        .leads-table tr:hover {
+            background: #f9fafb;
+        }
+        .company-name {
+            font-weight: 600;
+            color: #111827;
+            margin-bottom: 4px;
+        }
+        .company-meta {
+            font-size: 13px;
+            color: #6b7280;
+        }
+        .poc-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .poc-item {
+            padding: 8px 0;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        .poc-item:last-child {
+            border-bottom: none;
+        }
+        .poc-name {
+            font-weight: 500;
+            color: #111827;
+        }
+        .poc-title {
+            font-size: 13px;
+            color: #6b7280;
+        }
+        .poc-email {
+            font-size: 13px;
+            color: #2563eb;
+        }
+        .poc-email.not-revealed {
+            color: #9ca3af;
+            font-style: italic;
+        }
+        .source-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .source-linkedin { background: #dbeafe; color: #1d4ed8; }
+        .source-indeed { background: #fce7f3; color: #be185d; }
+        .source-glassdoor { background: #d1fae5; color: #059669; }
+        .source-naukri { background: #e0e7ff; color: #4338ca; }
+        .source-other { background: #f3f4f6; color: #6b7280; }
+
+        .lead-checkbox {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+        .action-btn {
+            padding: 8px 14px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            border: 1px solid transparent;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        .action-btn svg {
+            width: 16px;
+            height: 16px;
+            flex-shrink: 0;
+        }
+        .action-btn.primary {
+            background: var(--primary-blue);
+            color: white;
+            border-color: var(--primary-blue);
+        }
+        .action-btn.primary:hover {
+            background: var(--primary-dark);
+            border-color: var(--primary-dark);
+        }
+        .action-btn.secondary {
+            background: white;
+            color: var(--text-medium);
+            border-color: var(--border-light);
+        }
+        .action-btn.secondary:hover {
+            background: var(--bg-light);
+            border-color: var(--border-medium);
+        }
+        .action-btn.success {
+            background: #10b981;
+            color: white;
+            border-color: #10b981;
+        }
+        .action-btn.success:hover {
+            background: #059669;
+            border-color: #059669;
+        }
+        .action-btn.sm {
+            padding: 6px 10px;
+            font-size: 12px;
+        }
+        .action-btn.sm svg {
+            width: 14px;
+            height: 14px;
+        }
+        /* View Job Link */
+        .view-job-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--primary-blue);
+            background: #eff6ff;
+            text-decoration: none;
+            margin-top: 6px;
+            transition: all 0.2s;
+        }
+        .view-job-link:hover {
+            background: #dbeafe;
+            color: #1d4ed8;
+        }
+        .view-job-link svg {
+            width: 12px;
+            height: 12px;
+        }
+        /* Source and Actions Cell */
+        .source-cell {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 6px;
+        }
+        .actions-cell {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .bulk-actions {
+            display: none;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            background: #eff6ff;
+            border-radius: 8px;
+            margin-bottom: 16px;
+        }
+        .bulk-actions.show {
+            display: flex;
+        }
+        .selected-count {
+            font-weight: 600;
+            color: #1d4ed8;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #6b7280;
+        }
+        .empty-state i {
+            font-size: 48px;
+            color: #d1d5db;
+            margin-bottom: 16px;
+        }
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: #6b7280;
+            text-decoration: none;
+            font-size: 14px;
+            margin-bottom: 16px;
+        }
+        .back-link:hover {
+            color: #3b82f6;
+        }
+        .back-link svg {
+            width: 16px;
+            height: 16px;
+        }
+        .empty-state svg {
+            width: 48px;
+            height: 48px;
+            color: #d1d5db;
+            margin-bottom: 16px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header" style="background: #3B82F6; color: white; display: flex; align-items: center; justify-content: space-between; padding: 0 24px; height: 64px;">
+        <div class="header-logo" style="display: flex; align-items: center; gap: 12px;">
+            <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo" style="height: 40px; width: auto;" onerror="this.style.display='none'">
+            <span class="header-title" style="font-size: 18px; font-weight: 700;">Jobs Pipeline</span>
+            <span class="header-subtitle" style="font-size: 13px; opacity: 0.8; margin-left: 8px;">powered by Techgene</span>
+        </div>
+        <div class="header-actions">
+            <a href="/settings" class="header-btn" title="Settings" style="background: rgba(255,255,255,0.15); border: none; color: white; padding: 8px 12px; border-radius: 6px; text-decoration: none;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+            </a>
+        </div>
+    </header>
+
+    <div class="app-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <button class="sidebar-toggle" onclick="toggleSidebar()" title="Menu">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="3" y1="12" x2="21" y2="12"/>
+                        <line x1="3" y1="6" x2="21" y2="6"/>
+                        <line x1="3" y1="18" x2="21" y2="18"/>
+                    </svg>
+                </button>
+            </div>
+
+            <nav class="sidebar-nav">
+                <a href="/dashboard" class="nav-item">
+                    <span class="nav-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="7" height="9"/>
+                            <rect x="14" y="3" width="7" height="5"/>
+                            <rect x="14" y="12" width="7" height="9"/>
+                            <rect x="3" y="16" width="7" height="5"/>
+                        </svg>
+                    </span>
+                    <span class="nav-text">Dashboard</span>
+                </a>
+
+                <!-- Lead Engine with submenu -->
+                <div class="nav-group expanded">
+                    <div class="nav-item nav-group-header" onclick="toggleNavGroup(this)">
+                        <span class="nav-icon">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="3"/>
+                                <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4"/>
+                            </svg>
+                        </span>
+                        <span class="nav-text">Lead Engine</span>
+                        <span class="nav-arrow">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"/>
+                            </svg>
+                        </span>
+                    </div>
+                    <div class="nav-submenu show">
+                        <a href="/lead-engine" class="nav-subitem">
+                            <span class="nav-text">Lead Search</span>
+                        </a>
+                        <a href="/session-manager" class="nav-subitem active">
+                            <span class="nav-text">Session Manager</span>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Campaign Manager with submenu -->
+                <div class="nav-group">
+                    <div class="nav-item nav-group-header" onclick="toggleNavGroup(this)">
+                        <span class="nav-icon">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                                <circle cx="9" cy="7" r="4"/>
+                                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                            </svg>
+                        </span>
+                        <span class="nav-text">Campaign Manager</span>
+                        <span class="nav-arrow">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"/>
+                            </svg>
+                        </span>
+                    </div>
+                    <div class="nav-submenu">
+                        <a href="/campaign-manager/new" class="nav-subitem">
+                            <span class="nav-text">Start New Campaign</span>
+                        </a>
+                        <a href="/campaign-manager" class="nav-subitem">
+                            <span class="nav-text">Campaign Stats</span>
+                        </a>
+                        <a href="/campaign-manager/templates" class="nav-subitem">
+                            <span class="nav-text">Email Templates</span>
+                        </a>
+                    </div>
+                </div>
+
+                <a href="/response-manager" class="nav-item">
+                    <span class="nav-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                        </svg>
+                    </span>
+                    <span class="nav-text">Response Manager</span>
+                </a>
+
+                <a href="/analytics" class="nav-item">
+                    <span class="nav-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="20" x2="18" y2="10"/>
+                            <line x1="12" y1="20" x2="12" y2="4"/>
+                            <line x1="6" y1="20" x2="6" y2="14"/>
+                        </svg>
+                    </span>
+                    <span class="nav-text">Analytics</span>
+                </a>
+
+                <a href="/settings" class="nav-item">
+                    <span class="nav-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="3"/>
+                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                        </svg>
+                    </span>
+                    <span class="nav-text">Settings</span>
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content" id="main-content">
+            <!-- Back Link -->
+            <a href="/session-manager" class="back-link">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="19" y1="12" x2="5" y2="12"/>
+                    <polyline points="12 19 5 12 12 5"/>
+                </svg>
+                Back to Session Manager
+            </a>
+
+            <!-- Session Header -->
+            <div class="session-detail-header">
+                <div class="session-title-row">
+                    <div>
+                        <h1 class="session-title" id="sessionName">Loading...</h1>
+                        <div class="session-meta">
+                            <span id="sessionDate">-</span>
+                            <span class="status-badge status-ready" id="sessionStatus">-</span>
+                        </div>
+                    </div>
+                    <div class="session-actions-top">
+                        <button class="action-btn secondary" onclick="exportSession()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                <polyline points="7 10 12 15 17 10"/>
+                                <line x1="12" y1="15" x2="12" y2="3"/>
+                            </svg>
+                            Export CSV
+                        </button>
+                        <button class="action-btn primary" onclick="continueSession()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polygon points="5 3 19 12 5 21 5 3"/>
+                            </svg>
+                            Continue Search
+                        </button>
+                    </div>
+                </div>
+
+                <div class="stats-row">
+                    <div class="stat-item">
+                        <div class="stat-icon leads">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                                <polyline points="9 22 9 12 15 12 15 22"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <div class="stat-value" id="totalLeads">0</div>
+                            <div class="stat-label">Companies</div>
+                        </div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-icon pocs">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                                <circle cx="9" cy="7" r="4"/>
+                                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <div class="stat-value" id="totalPocs">0</div>
+                            <div class="stat-label">POCs</div>
+                        </div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-icon emails">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                                <polyline points="22,6 12,13 2,6"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <div class="stat-value" id="totalEmails">0</div>
+                            <div class="stat-label">Emails Revealed</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="filters-row" id="filtersRow">
+                    <!-- Filters will be populated here -->
+                </div>
+            </div>
+
+            <!-- Leads Section -->
+            <div class="leads-section">
+                <div class="leads-header">
+                    <h2 class="leads-title">Leads (<span id="leadsCount">0</span>)</h2>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="action-btn secondary" onclick="selectAll()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="9 11 12 14 22 4"/>
+                                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+                            </svg>
+                            Select All
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Bulk Actions -->
+                <div class="bulk-actions" id="bulkActions">
+                    <span class="selected-count"><span id="selectedCount">0</span> selected</span>
+                    <button class="action-btn success" onclick="forwardToCampaign()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="22" y1="2" x2="11" y2="13"/>
+                            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                        </svg>
+                        Send to Campaign
+                    </button>
+                    <button class="action-btn secondary" onclick="exportSelected()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="7 10 12 15 17 10"/>
+                            <line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                        Export Selected
+                    </button>
+                    <button class="action-btn secondary" onclick="clearSelection()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"/>
+                            <line x1="6" y1="6" x2="18" y2="18"/>
+                        </svg>
+                        Clear
+                    </button>
+                </div>
+
+                <!-- Leads Table -->
+                <div style="overflow-x: auto;">
+                    <table class="leads-table" id="leadsTable">
+                        <thead>
+                            <tr>
+                                <th style="width: 50px; text-align: center;">
+                                    <input type="checkbox" class="lead-checkbox" id="selectAllCheckbox" onchange="toggleSelectAll()">
+                                </th>
+                                <th style="min-width: 200px;">Company</th>
+                                <th style="min-width: 150px;">Job Opening</th>
+                                <th style="min-width: 200px;">POCs</th>
+                                <th style="min-width: 140px;">Source</th>
+                                <th style="width: 80px; text-align: center;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leadsTableBody">
+                            <!-- Leads will be populated here -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Empty State -->
+                <div class="empty-state" id="emptyState" style="display: none;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                    </svg>
+                    <h3>No leads in this session</h3>
+                    <p>Run a search to generate leads</p>
+                    <button class="action-btn primary" onclick="continueSession()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"/>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                        </svg>
+                        Start Search
+                    </button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Get session ID from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const sessionId = urlParams.get('id') || window.location.pathname.split('/').pop();
+
+        // State
+        let session = null;
+        let leads = [];
+        let selectedLeads = new Set();
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadSessionDetails();
+        });
+
+        // Load session details
+        async function loadSessionDetails() {
+            try {
+                const response = await fetch(`/api/sessions/${sessionId}`);
+                const data = await response.json();
+
+                if (!data.success) {
+                    alert('Session not found');
+                    window.location.href = '/session-manager';
+                    return;
+                }
+
+                session = data.session;
+                leads = data.leads || [];
+
+                renderSessionHeader();
+                renderLeads();
+            } catch (error) {
+                console.error('Error loading session:', error);
+                alert('Error loading session');
+            }
+        }
+
+        // Render session header
+        function renderSessionHeader() {
+            document.getElementById('sessionName').textContent = session.name;
+
+            const createdDate = new Date(session.created_at);
+            document.getElementById('sessionDate').textContent = `Created ${createdDate.toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            })}`;
+
+            const statusEl = document.getElementById('sessionStatus');
+            statusEl.textContent = session.status;
+            statusEl.className = `status-badge status-${session.status}`;
+
+            document.getElementById('totalLeads').textContent = session.total_leads || 0;
+            document.getElementById('totalPocs').textContent = session.total_pocs || 0;
+            document.getElementById('totalEmails').textContent = session.total_emails || 0;
+
+            // Render filters
+            const filtersRow = document.getElementById('filtersRow');
+            filtersRow.innerHTML = '';
+
+            if (session.job_titles && session.job_titles.length > 0) {
+                session.job_titles.forEach(title => {
+                    filtersRow.innerHTML += `<span class="filter-tag"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>${escapeHtml(title)}</span>`;
+                });
+            }
+
+            if (session.locations && session.locations.length > 0) {
+                session.locations.forEach(loc => {
+                    filtersRow.innerHTML += `<span class="filter-tag"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>${escapeHtml(loc)}</span>`;
+                });
+            }
+        }
+
+        // Render leads table
+        function renderLeads() {
+            const tbody = document.getElementById('leadsTableBody');
+            const emptyState = document.getElementById('emptyState');
+
+            document.getElementById('leadsCount').textContent = leads.length;
+
+            if (leads.length === 0) {
+                tbody.innerHTML = '';
+                emptyState.style.display = 'block';
+                return;
+            }
+
+            emptyState.style.display = 'none';
+            tbody.innerHTML = leads.map((lead, index) => createLeadRow(lead, index)).join('');
+        }
+
+        // Create lead row HTML
+        function createLeadRow(lead, index) {
+            const company = lead.company || {};
+            const pocs = lead.pocs || [];
+            const sourceClass = getSourceClass(lead.source);
+
+            const pocsHtml = pocs.length > 0 ? pocs.map(poc => `
+                <div class="poc-item">
+                    <div class="poc-name">${escapeHtml(poc.name || 'Unknown')}</div>
+                    <div class="poc-title">${escapeHtml(poc.title || '-')}</div>
+                    <div class="poc-email ${!poc.email || poc.email.includes('email_not_unlocked') ? 'not-revealed' : ''}">
+                        ${poc.email && !poc.email.includes('email_not_unlocked') ? escapeHtml(poc.email) : 'Email not revealed'}
+                    </div>
+                </div>
+            `).join('') : '<div style="color: var(--text-light);">No POCs</div>';
+
+            return `
+                <tr data-lead-id="${lead.id}">
+                    <td style="vertical-align: top; padding-top: 18px;">
+                        <input type="checkbox" class="lead-checkbox" onchange="toggleLeadSelection(${lead.id})">
+                    </td>
+                    <td>
+                        <div class="company-name">${escapeHtml(company.name || 'Unknown')}</div>
+                        <div class="company-meta">
+                            ${company.industry ? `<span>${escapeHtml(company.industry)}</span>` : ''}
+                            ${company.size ? `<span> | ${company.size} employees</span>` : ''}
+                            ${company.location ? `<span> | ${escapeHtml(company.location)}</span>` : ''}
+                        </div>
+                        ${company.website ? `<a href="${escapeHtml(company.website)}" target="_blank" style="color: var(--primary-blue); font-size: 13px;">${escapeHtml(company.domain || company.website)}</a>` : ''}
+                    </td>
+                    <td>
+                        <div>${escapeHtml(lead.job_opening || '-')}</div>
+                    </td>
+                    <td>
+                        <ul class="poc-list">
+                            ${pocsHtml}
+                        </ul>
+                    </td>
+                    <td>
+                        <div class="source-cell">
+                            <span class="source-badge ${sourceClass}">${escapeHtml(lead.source || 'Unknown')}</span>
+                            ${lead.source_url ? `
+                                <a href="${escapeHtml(lead.source_url)}" target="_blank" class="view-job-link">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                                        <polyline points="15 3 21 3 21 9"/>
+                                        <line x1="10" y1="14" x2="21" y2="3"/>
+                                    </svg>
+                                    View Job
+                                </a>
+                            ` : ''}
+                        </div>
+                    </td>
+                    <td style="vertical-align: top; padding-top: 18px;">
+                        <div class="actions-cell">
+                            <button class="action-btn secondary sm" onclick="viewLead(${lead.id})" title="View Details">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                    <circle cx="12" cy="12" r="3"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }
+
+        // Get source class for styling
+        function getSourceClass(source) {
+            if (!source) return 'source-other';
+            const s = source.toLowerCase();
+            if (s.includes('linkedin')) return 'source-linkedin';
+            if (s.includes('indeed')) return 'source-indeed';
+            if (s.includes('glassdoor')) return 'source-glassdoor';
+            if (s.includes('naukri')) return 'source-naukri';
+            return 'source-other';
+        }
+
+        // Toggle lead selection
+        function toggleLeadSelection(leadId) {
+            if (selectedLeads.has(leadId)) {
+                selectedLeads.delete(leadId);
+            } else {
+                selectedLeads.add(leadId);
+            }
+            updateBulkActions();
+        }
+
+        // Toggle select all
+        function toggleSelectAll() {
+            const checkbox = document.getElementById('selectAllCheckbox');
+            if (checkbox.checked) {
+                leads.forEach(lead => selectedLeads.add(lead.id));
+            } else {
+                selectedLeads.clear();
+            }
+
+            // Update all checkboxes
+            document.querySelectorAll('.leads-table tbody .lead-checkbox').forEach((cb, index) => {
+                cb.checked = checkbox.checked;
+            });
+
+            updateBulkActions();
+        }
+
+        // Select all
+        function selectAll() {
+            document.getElementById('selectAllCheckbox').checked = true;
+            toggleSelectAll();
+        }
+
+        // Clear selection
+        function clearSelection() {
+            selectedLeads.clear();
+            document.getElementById('selectAllCheckbox').checked = false;
+            document.querySelectorAll('.leads-table tbody .lead-checkbox').forEach(cb => {
+                cb.checked = false;
+            });
+            updateBulkActions();
+        }
+
+        // Update bulk actions visibility
+        function updateBulkActions() {
+            const bulkActions = document.getElementById('bulkActions');
+            const selectedCount = document.getElementById('selectedCount');
+
+            if (selectedLeads.size > 0) {
+                bulkActions.classList.add('show');
+                selectedCount.textContent = selectedLeads.size;
+            } else {
+                bulkActions.classList.remove('show');
+            }
+        }
+
+        // Continue session (go to lead engine with this session)
+        function continueSession() {
+            window.location.href = `/lead-engine?session=${sessionId}`;
+        }
+
+        // Forward to campaign
+        function forwardToCampaign() {
+            if (selectedLeads.size === 0) {
+                alert('Please select at least one lead');
+                return;
+            }
+
+            // Store selected leads in localStorage for campaign manager
+            const selectedLeadData = leads.filter(l => selectedLeads.has(l.id));
+            localStorage.setItem('campaignLeads', JSON.stringify(selectedLeadData));
+            localStorage.setItem('campaignSessionId', sessionId);
+
+            alert(`${selectedLeads.size} leads ready for campaign. This will be available in Campaign Manager.`);
+            // window.location.href = '/campaign-manager';
+        }
+
+        // Export session to CSV
+        function exportSession() {
+            exportLeadsToCSV(leads, `session_${session.name.replace(/[^a-z0-9]/gi, '_')}`);
+        }
+
+        // Export selected leads
+        function exportSelected() {
+            if (selectedLeads.size === 0) {
+                alert('Please select at least one lead');
+                return;
+            }
+            const selectedData = leads.filter(l => selectedLeads.has(l.id));
+            exportLeadsToCSV(selectedData, `selected_leads`);
+        }
+
+        // Export to CSV
+        function exportLeadsToCSV(data, filename) {
+            const rows = [['Company', 'Industry', 'Size', 'Location', 'Website', 'Job Opening', 'Source', 'POC Name', 'POC Title', 'POC Email']];
+
+            data.forEach(lead => {
+                const company = lead.company || {};
+                const pocs = lead.pocs || [];
+
+                if (pocs.length === 0) {
+                    rows.push([
+                        company.name || '',
+                        company.industry || '',
+                        company.size || '',
+                        company.location || '',
+                        company.website || '',
+                        lead.job_opening || '',
+                        lead.source || '',
+                        '', '', ''
+                    ]);
+                } else {
+                    pocs.forEach(poc => {
+                        rows.push([
+                            company.name || '',
+                            company.industry || '',
+                            company.size || '',
+                            company.location || '',
+                            company.website || '',
+                            lead.job_opening || '',
+                            lead.source || '',
+                            poc.name || '',
+                            poc.title || '',
+                            poc.email && !poc.email.includes('email_not_unlocked') ? poc.email : ''
+                        ]);
+                    });
+                }
+            });
+
+            const csvContent = rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `${filename}_${new Date().toISOString().split('T')[0]}.csv`;
+            link.click();
+        }
+
+        // View lead details
+        function viewLead(leadId) {
+            const lead = leads.find(l => l.id === leadId);
+            if (lead) {
+                console.log('Lead details:', lead);
+                alert(`Company: ${lead.company?.name}\nPOCs: ${lead.pocs?.length || 0}\n\nFull details logged to console.`);
+            }
+        }
+
+        // Toggle nav group
+        function toggleNavGroup(element) {
+            const navGroup = element.closest('.nav-group');
+            if (navGroup) {
+                navGroup.classList.toggle('expanded');
+            }
+        }
+
+        // Toggle sidebar
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('collapsed');
+            document.body.classList.toggle('sidebar-collapsed');
+        }
+
+        // Escape HTML
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>

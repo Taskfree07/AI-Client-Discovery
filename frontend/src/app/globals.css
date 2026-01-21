@@ -1,0 +1,14 @@
+/* Import existing CSS without modification */
+@import './css/style.css';
+@import './css/jobs_pipeline.css';
+
+/* Additional global resets to prevent flicker */
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+}

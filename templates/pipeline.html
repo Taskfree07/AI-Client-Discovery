@@ -30,12 +30,6 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a href="/manufacturing-icp" class="nav-link">
-                            <span class="nav-icon">🏭</span>
-                            <span>Manufacturing ICP</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
                         <a href="/leads" class="nav-link">
                             <span class="nav-icon">👥</span>
                             <span>All Leads</span>
@@ -116,8 +110,21 @@
             <div class="card">
                 <div class="card-header">
                     <h2 class="card-title">🔍 Start New Discovery</h2>
+                    <div style="display: flex; gap: 1rem; background: #f5f5f5; padding: 0.5rem; border-radius: 8px;">
+                        <button type="button" class="btn btn-sm" id="toggleJobSearch"
+                                style="background: #2196f3; color: white;"
+                                onclick="toggleSearchMode('job')">
+                            💼 Job Search
+                        </button>
+                        <button type="button" class="btn btn-sm btn-secondary" id="toggleCompanySearch"
+                                onclick="toggleSearchMode('company')">
+                            🏢 Company Search
+                        </button>
+                    </div>
                 </div>
-                <form id="discoveryForm" onsubmit="startDiscovery(event)">
+
+                <!-- Job Search Form (Original) -->
+                <form id="discoveryForm" onsubmit="startDiscovery(event)" style="display: block;">
                     <div class="form-row">
                         <div class="form-group flex-2">
                             <label class="form-label">Search Keywords</label>
@@ -157,6 +164,72 @@
 
                     <button type="submit" class="btn btn-primary btn-lg" id="startBtn">
                         🚀 Start LinkedIn Job Discovery
+                    </button>
+                </form>
+
+                <!-- Company Search Form (New) -->
+                <form id="companySearchForm" onsubmit="startCompanySearch(event)" style="display: none;">
+                    <div class="form-row">
+                        <div class="form-group flex-2">
+                            <label class="form-label">Company Name</label>
+                            <input type="text" id="companyName" class="form-input"
+                                   placeholder="e.g., Google, Microsoft, Acme Corp" required>
+                            <div class="form-hint">Name of the company to search for</div>
+                        </div>
+                        <div class="form-group flex-2">
+                            <label class="form-label">Location (Optional)</label>
+                            <input type="text" id="companyLocation" class="form-input"
+                                   placeholder="e.g., United States, New York, India">
+                            <div class="form-hint">Filter by city, state, or country</div>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group flex-1">
+                            <label class="form-label">Min Employees</label>
+                            <input type="number" id="companyMinEmployees" class="form-input"
+                                   value="50" min="1">
+                        </div>
+                        <div class="form-group flex-1">
+                            <label class="form-label">Max Employees</label>
+                            <input type="number" id="companyMaxEmployees" class="form-input"
+                                   value="10000" min="1">
+                        </div>
+                        <div class="form-group flex-2">
+                            <label class="form-label">Employee Role Type</label>
+                            <select id="roleType" class="form-input">
+                                <option value="all">All Roles</option>
+                                <option value="executive">Executives (CEO, President, Founder)</option>
+                                <option value="tech">Tech Leadership (CTO, VP Engineering)</option>
+                                <option value="hr">HR/Recruiting (CHRO, HR Director)</option>
+                                <option value="sales">Sales (VP Sales, Sales Director)</option>
+                                <option value="marketing">Marketing (CMO, Marketing Director)</option>
+                                <option value="finance">Finance (CFO, Finance Director)</option>
+                            </select>
+                            <div class="form-hint">Type of employees to find</div>
+                        </div>
+                        <div class="form-group flex-1">
+                            <label class="form-label">Max Results</label>
+                            <input type="number" id="employeeLimit" class="form-input"
+                                   value="25" min="1" max="100">
+                            <div class="form-hint">Up to 100</div>
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 1.5rem;">
+                        <div style="padding: 1rem; background: #fff3e0; border-left: 4px solid #ff9800; border-radius: 4px;">
+                            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                                <span style="font-size: 1.2rem;">🏢</span>
+                                <span style="font-weight: 600; color: #e65100;">Direct Company Employee Discovery</span>
+                            </div>
+                            <div style="font-size: 0.9rem; color: #555;">
+                                Search for companies by name and location, then find employees with their email addresses revealed via Apollo
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-lg" id="companySearchBtn">
+                        🔍 Search Company & Find Employees
                     </button>
                 </form>
             </div>

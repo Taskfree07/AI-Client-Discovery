@@ -1,0 +1,25 @@
+<step title="Incoming Request" date="2026-01-08T13:08:35.687" instance="b08b79" url="/api/zipdeploy?isAsync=true" method="POST" type="request" pid="770,1,7" Accept="*/*" Host="ai-client-discovery.scm.azurewebsites.net" User-Agent="AZURECLI/2.79.0 (MSI)" Accept-Encoding="gzip, deflate" Authorization="Bea..." Cache-Control="no-cache" Content-Type="application/octet-stream" Content-Length="330683" x-ms-client-request-id="1e5ac59f-ec93-11f0-bae3-b48c9d30dc96" x-ms-artifact-checksum="94c8364ac66b605732eaaa22e38d84f30e1c54d98dc7ddc3bd01922033c4956d" X-ARR-LOG-ID="1e5ac59f-ec93-11f0-bae3-b48c9d30dc96" CLIENT-IP="182.156.149.64:65388" X-SITE-DEPLOYMENT-ID="ai-client-discovery" WAS-DEFAULT-HOSTNAME="ai-client-discovery.scm.azurewebsites.net" X-Forwarded-Proto="https" X-AppService-Proto="https" X-Forwarded-TlsVersion="1.3" X-WAWS-Unencoded-URL="/api/zipdeploy?isAsync=true" X-Client-IP="182.156.149.64" X-Client-Port="65388" >
+  <step title="Cleanup Xml Logs" date="2026-01-08T13:08:35.705" /><!-- duration: 30ms -->
+  <step title="ZipPushDeploy" date="2026-01-08T13:08:36.122" >
+    <step title="ZipDeploy. Extract zip. Remote build." date="2026-01-08T13:08:36.127" /><!-- duration: 7ms -->
+    <step title="None repository commit" date="2026-01-08T13:08:36.185" >
+      <step title="Commit id: dd8aef7c-33c1-49eb-9c7f-0564410b5913" date="2026-01-08T13:08:36.195" Message="N/A" AuthorName="N/A" AuthorEmail="N/A" /><!-- duration: 17ms -->
+    </step><!-- duration: 39ms -->
+    <step title="Starting PushDeployAsync" date="2026-01-08T13:08:36.271" /><!-- duration: 4ms -->
+    <step title="Writing artifact to /tmp/zipdeploy/48d4d9e5-a37d-4f7e-bd94-266965033983.zip" date="2026-01-08T13:08:36.335" >
+      <step title="Writing multipart request body to /tmp/zipdeploy/48d4d9e5-a37d-4f7e-bd94-266965033983.zip" date="2026-01-08T13:08:36.345" /><!-- duration: 49ms -->
+    </step><!-- duration: 456ms -->
+    <step title="None repository commit" date="2026-01-08T13:08:36.829" >
+      <step title="Commit id: dd8aef7c-33c1-49eb-9c7f-0564410b5913" date="2026-01-08T13:08:36.839" Message="N/A" AuthorName="N/A" AuthorEmail="N/A" /><!-- duration: 9ms -->
+    </step><!-- duration: 23ms -->
+    <step title="Start deployment in the background" date="2026-01-08T13:08:36.859" >
+      <step title="None repository commit" date="2026-01-08T13:08:36.898" >
+        <step title="Commit id: dd8aef7c-33c1-49eb-9c7f-0564410b5913" date="2026-01-08T13:08:36.908" Message="N/A" AuthorName="N/A" AuthorEmail="N/A" /><!-- duration: 12ms -->
+      </step><!-- duration: 73ms -->
+      <step title="Acquiring Deployment Lock" date="2026-01-08T13:08:36.987" /><!-- duration: 22ms -->
+      <step title="Cannot Acquire Deployment Lock already held" date="2026-01-08T13:08:37.032" /><!-- duration: 16ms -->
+    </step><!-- duration: 401ms -->
+    <step title="There is a deployment currently in progress. Please try again when it completes." date="2026-01-08T13:08:37.299" /><!-- duration: 30ms -->
+  </step><!-- duration: 1268ms -->
+  <step title="Outgoing response" date="2026-01-08T13:08:37.563" type="response" statusCode="409" statusText="Conflict" /><!-- duration: 11ms -->
+</step><!-- duration: 1906ms -->

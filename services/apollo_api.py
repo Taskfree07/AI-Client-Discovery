@@ -178,56 +178,92 @@ class ApolloAPIService:
             print(f"[ERROR] Error enriching organization {domain}: {str(e)}")
             return None
 
-    def find_contacts(self, domain: str, titles: List[str] = None, 
+    def search_organizations(self, organization_name: str, per_page: int = 5) -> List[Dict]:
+        """
+        Search for organizations by name
+        Returns list of matching organizations
+        """
+        try:
+            print(f"[SEARCH] Searching organizations by name: {organization_name}")
+
+            url = f"{self.base_url}/api/v1/mixed_companies/search"
+
+            payload = {
+                'q_organization_name': organization_name,
+                'page': 1,
+                'per_page': per_page
+            }
+
+            response = requests.post(url, json=payload, headers=self.headers)
+            response.raise_for_status()
+            data = response.json()
+
+            organizations = []
+            if data.get('organizations'):
+                for org in data['organizations']:
+                    organizations.append({
+                        'id': org.get('id', ''),
+                        'name': org.get('name', ''),
+                        'primary_domain': org.get('primary_domain', ''),
+                        'website_url': org.get('website_url', ''),
+                        'estimated_num_employees': org.get('estimated_num_employees', 0),
+                        'industry': org.get('industry', ''),
+                        'city': org.get('city', ''),
+                        'state': org.get('state', ''),
+                        'country': org.get('country', ''),
+                        'linkedin_url': org.get('linkedin_url', '')
+                    })
+                print(f"[OK] Found {len(organizations)} organizations matching '{organization_name}'")
+            else:
+                print(f"[WARN] No organizations found for '{organization_name}'")
+
+            return organizations
+
+        except Exception as e:
+            print(f"[ERROR] Error searching organizations: {str(e)}")
+            return []
+
+    def find_contacts(self, domain: str, titles: List[str] = None,
                       seniorities: List[str] = None, departments: List[str] = None,
                       per_page: int = 10, reveal_emails: bool = True) -> List[Dict]:
         """
         Find decision maker contacts for a company
-        
+
         Args:
             domain: Company domain to search
-            titles: Specific job titles to search for
+            titles: Specific job titles to search for (None = no title filter)
             seniorities: Seniority levels ('owner', 'founder', 'c_suite', 'partner', 'vp', 'head', 'director', 'manager', etc.)
             departments: Departments ('executive', 'engineering', 'sales', 'hr', 'marketing', 'finance', etc.)
             per_page: Number of results (default 10)
             reveal_emails: Set True to unlock email addresses (uses Apollo credits)
-        
+
         Note: reveal_phone_number requires webhook_url, so we skip it
         """
-        # Default to leadership titles if none specified
-        if titles is None:
-            titles = [
-                'CEO', 'Chief Executive Officer', 'Founder', 'Co-Founder', 'Owner', 'President',
-                'CTO', 'Chief Technology Officer', 'VP Engineering', 'VP of Engineering',
-                'CFO', 'Chief Financial Officer', 
-                'COO', 'Chief Operating Officer',
-                'CMO', 'Chief Marketing Officer',
-                'CHRO', 'VP Human Resources', 'HR Director', 'Head of HR', 'Talent Acquisition',
-                'VP Sales', 'Sales Director', 'Head of Sales',
-                'Managing Director', 'General Manager', 'Partner'
-            ]
-
         try:
             print(f"\n[SEARCH] Searching for contacts at {domain}")
             print(f"   Reveal emails: {reveal_emails}")
             print(f"   Per page: {per_page}")
 
-            url = f"{self.base_url}/v1/mixed_people/search"
+            url = f"{self.base_url}/api/v1/mixed_people/search"
 
             payload = {
                 'q_organization_domains': domain,
-                'person_titles': titles,
                 'page': 1,
                 'per_page': per_page,
                 'reveal_personal_emails': reveal_emails
                 # Note: reveal_phone_number requires webhook_url parameter
             }
-            
+
+            # Add title filter only if specified
+            if titles:
+                payload['person_titles'] = titles
+                print(f"   Titles filter: {len(titles)} titles")
+
             # Add seniority filter if specified
             if seniorities:
                 payload['person_seniorities'] = seniorities
                 print(f"   Seniorities: {seniorities}")
-            
+
             # Add department filter if specified
             if departments:
                 payload['person_departments'] = departments
@@ -310,7 +346,7 @@ class ApolloAPIService:
     def search_people(self, person_titles: List[str] = None, person_locations: List[str] = None,
                      organization_num_employees_ranges: List[str] = None, 
                      person_seniorities: List[str] = None, organization_industry_tag_ids: List[str] = None,
-                     per_page: int = 25, page: int = 1) -> List[Dict]:
+                     per_page: int = 25, page: int = 1, reveal_emails: bool = True) -> List[Dict]:
         """
         Search for people across companies using Apollo's /people_search endpoint
         
@@ -322,6 +358,7 @@ class ApolloAPIService:
             organization_industry_tag_ids: List of industry IDs
             per_page: Results per page (max 100)
             page: Page number
+            reveal_emails: Set True to unlock email addresses (uses Apollo credits)
             
         Returns:
             List of contact dictionaries
@@ -334,13 +371,15 @@ class ApolloAPIService:
                 print(f"   Locations: {person_locations}")
             if organization_num_employees_ranges:
                 print(f"   Company size: {organization_num_employees_ranges}")
+            print(f"   Reveal emails: {reveal_emails}")
 
             # Use correct Apollo API endpoint
             url = f"{self.base_url}/api/v1/mixed_people/search"
 
             payload = {
                 'page': page,
-                'per_page': min(per_page, 100)  # Apollo max is 100
+                'per_page': min(per_page, 100),  # Apollo max is 100
+                'reveal_personal_emails': reveal_emails
             }
             
             # Add filters
@@ -459,14 +498,132 @@ class ApolloAPIService:
             reveal_emails=reveal_emails
         )
     
+    def bulk_reveal_emails(self, contacts: List[Dict]) -> List[Dict]:
+        """
+        Reveal emails for multiple contacts using bulk_match endpoint
+
+        POST https://api.apollo.io/api/v1/people/bulk_match?reveal_personal_emails=true
+
+        Args:
+            contacts: List of contact dicts with keys like:
+                - id (Apollo person ID)
+                - first_name, last_name, name
+                - domain or organization_name
+                - linkedin_url (optional)
+
+        Returns:
+            List of enriched contact dicts with revealed emails
+        """
+        if not contacts:
+            return []
+
+        print(f"\n[BULK REVEAL] Revealing emails for {len(contacts)} contacts...")
+
+        try:
+            # Use standard URL - reveal_personal_emails goes in payload body like other endpoints
+            url = f"{self.base_url}/api/v1/people/bulk_match"
+
+            # Build details array for bulk match
+            details = []
+            for contact in contacts:
+                detail = {}
+
+                # Add person identifiers - ID is most important
+                if contact.get('id'):
+                    detail['id'] = contact['id']
+                if contact.get('first_name'):
+                    detail['first_name'] = contact['first_name']
+                if contact.get('last_name'):
+                    detail['last_name'] = contact['last_name']
+                if contact.get('name'):
+                    detail['name'] = contact['name']
+                if contact.get('linkedin_url'):
+                    detail['linkedin_url'] = contact['linkedin_url']
+
+                # Add organization info for better matching
+                if contact.get('organization_name'):
+                    detail['organization_name'] = contact['organization_name']
+                if contact.get('domain'):
+                    detail['domain'] = contact['domain']
+                elif contact.get('organization_domain'):
+                    detail['domain'] = contact['organization_domain']
+
+                if detail:
+                    details.append(detail)
+                    print(f"   Detail: {detail.get('name', detail.get('id', 'unknown'))} @ {detail.get('domain', 'no domain')}")
+
+            if not details:
+                print("[WARN] No valid contact details for bulk match")
+                return contacts
+
+            # Include reveal_personal_emails in payload body (same pattern as /people/match endpoint)
+            payload = {
+                'details': details,
+                'reveal_personal_emails': True
+            }
+
+            print(f"\n   URL: {url}")
+            print(f"   Payload keys: {list(payload.keys())}")
+            print(f"   Sending {len(details)} contacts to bulk_match...")
+
+            response = requests.post(url, json=payload, headers=self.headers)
+
+            print(f"   Response status: {response.status_code}")
+
+            if response.status_code != 200:
+                print(f"   Response body: {response.text[:500]}")
+                response.raise_for_status()
+
+            data = response.json()
+
+            # Debug: Show raw response structure
+            print(f"   Response keys: {list(data.keys())}")
+            if 'matches' in data and data['matches']:
+                first_match = data['matches'][0] if data['matches'][0] else {}
+                print(f"   First match keys: {list(first_match.keys()) if first_match else 'None/Empty'}")
+
+            # Process results - Apollo returns 'matches' array
+            matches = data.get('matches', [])
+            print(f"   Got {len(matches)} matches back")
+
+            # Update contacts with revealed emails
+            revealed_count = 0
+            for i, match in enumerate(matches):
+                if match and i < len(contacts):
+                    email = match.get('email', '')
+                    email_status = match.get('email_status', '')
+
+                    # Debug: show raw email value
+                    print(f"   [{i}] Raw email: '{email}', status: '{email_status}'")
+
+                    # Update the contact with revealed email
+                    if email and 'email_not_unlocked' not in email and email_status not in ['unavailable', 'bounced']:
+                        contacts[i]['email'] = email
+                        contacts[i]['email_status'] = email_status
+                        revealed_count += 1
+                        print(f"   [OK] {contacts[i].get('name', 'Unknown')}: {email}")
+                    else:
+                        # Keep original contact data, email not available
+                        reason = email_status if email_status else ('locked' if 'email_not_unlocked' in email else 'no email')
+                        print(f"   [--] {contacts[i].get('name', 'Unknown')}: Not revealed ({reason})")
+
+            print(f"[BULK REVEAL] Revealed {revealed_count}/{len(contacts)} emails")
+            return contacts
+
+        except Exception as e:
+            print(f"[ERROR] Bulk reveal failed: {e}")
+            import traceback
+            traceback.print_exc()
+            return contacts
+
     def reveal_multiple_emails(self, person_ids: List[str]) -> List[Dict]:
         """
-        Reveal emails for multiple contacts at once
+        Reveal emails for multiple contacts at once (legacy method)
         Returns list of {person_id, email, success} dicts
         """
         results = []
         print(f"\n[LOCK] Revealing emails for {len(person_ids)} contacts...")
-        
+
         for i, person_id in enumerate(person_ids, 1):
             print(f"   [{i}/{len(person_ids)}] Processing {person_id}...")
             email = self.reveal_email(person_id)
@@ -475,7 +632,7 @@ class ApolloAPIService:
                 'email': email,
                 'success': email is not None
             })
-        
+
         success_count = sum(1 for r in results if r['success'])
         print(f"\n[OK] Revealed {success_count}/{len(person_ids)} emails")
         return results
@@ -745,6 +902,100 @@ class ApolloAPIService:
         ]
         
         return patterns
+
+    def search_companies_by_name(self, company_name: str, location: str = None,
+                                 min_employees: int = None, max_employees: int = None,
+                                 per_page: int = 10) -> List[Dict]:
+        """
+        Search for companies by name and optional location
+        Uses Apollo's /api/v1/mixed_companies/search endpoint
+
+        Args:
+            company_name: Company name to search for
+            location: Location filter (e.g., "United States", "New York", "India")
+            min_employees: Minimum number of employees
+            max_employees: Maximum number of employees
+            per_page: Number of results (max 100)
+
+        Returns:
+            List of company dictionaries with full details
+        """
+        try:
+            print(f"\n[SEARCH] Searching for companies by name: '{company_name}'")
+            if location:
+                print(f"   Location: {location}")
+            if min_employees or max_employees:
+                print(f"   Employee range: {min_employees or 0}-{max_employees or 'unlimited'}")
+
+            url = f"{self.base_url}/api/v1/mixed_companies/search"
+
+            payload = {
+                'q_organization_name': company_name,
+                'page': 1,
+                'per_page': min(per_page, 100)
+            }
+
+            # Add location filter if provided
+            if location:
+                payload['organization_locations'] = [location]
+
+            # Add employee range filter
+            if min_employees is not None or max_employees is not None:
+                min_emp = min_employees or 1
+                max_emp = max_employees or 1000000
+                payload['organization_num_employees_ranges'] = [f"{min_emp},{max_emp}"]
+
+            response = requests.post(url, json=payload, headers=self.headers)
+            response.raise_for_status()
+            data = response.json()
+
+            companies = []
+            if data.get('organizations'):
+                print(f"   Found {len(data['organizations'])} companies")
+
+                for org in data['organizations']:
+                    company = {
+                        # Basic Info
+                        'id': org.get('id', ''),
+                        'name': org.get('name', ''),
+                        'domain': org.get('primary_domain', ''),
+                        'website_url': org.get('website_url', ''),
+                        'logo_url': org.get('logo_url', ''),
+                        'short_description': org.get('short_description', ''),
+
+                        # Size & Industry
+                        'employees': org.get('estimated_num_employees', 0),
+                        'industry': org.get('industry', ''),
+                        'founded_year': org.get('founded_year', ''),
+
+                        # Location
+                        'city': org.get('city', ''),
+                        'state': org.get('state', ''),
+                        'country': org.get('country', ''),
+                        'address': org.get('raw_address', ''),
+
+                        # Contact
+                        'phone': org.get('phone', ''),
+                        'linkedin_url': org.get('linkedin_url', ''),
+
+                        # Financial
+                        'annual_revenue': org.get('annual_revenue_printed', ''),
+                        'total_funding': org.get('total_funding_printed', '')
+                    }
+                    companies.append(company)
+
+                    location_str = f"{company['city']}, {company['state']}" if company['city'] or company['state'] else company['country']
+                    print(f"   [OK] {company['name']} - {company['employees']} employees - {location_str}")
+            else:
+                print(f"   No companies found")
+
+            return companies
+
+        except Exception as e:
+            print(f"[ERROR] Error searching companies: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return []
 
     def check_company_size(self, employee_count: int, min_size: int = 50, max_size: int = 200) -> bool:
         """

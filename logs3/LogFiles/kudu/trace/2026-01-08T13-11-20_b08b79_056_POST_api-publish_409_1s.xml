@@ -1,0 +1,24 @@
+<step title="Incoming Request" date="2026-01-08T13:11:20.353" instance="b08b79" url="/api/publish?type=zip&amp;async=True" method="POST" type="request" pid="770,1,26" Accept="*/*" Host="ai-client-discovery.scm.azurewebsites.net" User-Agent="AZURECLI/2.79.0 (MSI)" Accept-Encoding="gzip, deflate" Authorization="Bea..." Cache-Control="no-cache" Content-Type="application/octet-stream" Cookie="ARRAffinity=b08b793703ed90c29d190499db3bc194822d9b232329810c8844678e66822c18; ARRAffinitySameSite=b08b793703ed90c29d190499db3bc194822d9b232329810c8844678e66822c18" Content-Length="330683" x-ms-client-request-id="7d4cbd78-ec93-11f0-b64c-b48c9d30dc96" x-ms-artifact-checksum="94c8364ac66b605732eaaa22e38d84f30e1c54d98dc7ddc3bd01922033c4956d" X-ARR-LOG-ID="7d4cbd78-ec93-11f0-b64c-b48c9d30dc96" CLIENT-IP="182.156.149.64:55832" X-SITE-DEPLOYMENT-ID="ai-client-discovery" WAS-DEFAULT-HOSTNAME="ai-client-discovery.scm.azurewebsites.net" X-Forwarded-Proto="https" X-AppService-Proto="https" X-Forwarded-TlsVersion="1.3" X-WAWS-Unencoded-URL="/api/publish?type=zip&amp;async=True" X-Client-IP="182.156.149.64" X-Client-Port="55832" >
+  <step title="Cleanup Xml Logs" date="2026-01-08T13:11:20.356" /><!-- duration: 28ms -->
+  <step title="OneDeploy" date="2026-01-08T13:11:20.595" >
+    <step title="None repository commit" date="2026-01-08T13:11:20.625" >
+      <step title="Commit id: 013f6211-3e59-41ac-8a47-4bd453992f88" date="2026-01-08T13:11:20.639" Message="N/A" AuthorName="N/A" AuthorEmail="N/A" /><!-- duration: 16ms -->
+    </step><!-- duration: 58ms -->
+    <step title="Starting PushDeployAsync" date="2026-01-08T13:11:20.686" /><!-- duration: 29ms -->
+    <step title="Writing artifact to /tmp/zipdeploy/4b133912-ace7-49f6-ab1a-81f8ace4c3f7.zip" date="2026-01-08T13:11:20.750" >
+      <step title="Writing multipart request body to /tmp/zipdeploy/4b133912-ace7-49f6-ab1a-81f8ace4c3f7.zip" date="2026-01-08T13:11:20.754" /><!-- duration: 15ms -->
+    </step><!-- duration: 127ms -->
+    <step title="None repository commit" date="2026-01-08T13:11:20.895" >
+      <step title="Commit id: 013f6211-3e59-41ac-8a47-4bd453992f88" date="2026-01-08T13:11:20.927" Message="N/A" AuthorName="N/A" AuthorEmail="N/A" /><!-- duration: 18ms -->
+    </step><!-- duration: 60ms -->
+    <step title="Start deployment in the background" date="2026-01-08T13:11:20.965" >
+      <step title="None repository commit" date="2026-01-08T13:11:20.999" >
+        <step title="Commit id: 013f6211-3e59-41ac-8a47-4bd453992f88" date="2026-01-08T13:11:21.019" Message="N/A" AuthorName="N/A" AuthorEmail="N/A" /><!-- duration: 17ms -->
+      </step><!-- duration: 40ms -->
+      <step title="Acquiring Deployment Lock" date="2026-01-08T13:11:21.057" /><!-- duration: 9ms -->
+      <step title="Cannot Acquire Deployment Lock already held" date="2026-01-08T13:11:21.101" /><!-- duration: 19ms -->
+    </step><!-- duration: 306ms -->
+    <step title="There is a deployment currently in progress. Please try again when it completes." date="2026-01-08T13:11:21.303" /><!-- duration: 29ms -->
+  </step><!-- duration: 757ms -->
+  <step title="Outgoing response" date="2026-01-08T13:11:21.393" type="response" statusCode="409" statusText="Conflict" /><!-- duration: 10ms -->
+</step><!-- duration: 1062ms -->

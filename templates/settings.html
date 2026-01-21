@@ -30,12 +30,6 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a href="/manufacturing-icp" class="nav-link">
-                            <span class="nav-icon">🏭</span>
-                            <span>Manufacturing ICP</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
                         <a href="/leads" class="nav-link">
                             <span class="nav-icon">👥</span>
                             <span>All Leads</span>
@@ -71,6 +65,7 @@
                         <h2 class="settings-section-title">🔍 Google Custom Search API</h2>
                         <p class="settings-section-description">
                             Configure Google Custom Search to find job openings across the web.
+                            <span id="google-api-status" style="margin-left: 10px; font-weight: 600;"></span>
                         </p>
 
                         <div class="form-group">
@@ -90,6 +85,13 @@
                             <div class="form-hint">
                                 Create a custom search engine at <a href="https://cse.google.com" target="_blank">Google CSE</a>
                             </div>
+                        </div>
+
+                        <div class="form-group">
+                            <button type="button" class="btn btn-secondary" onclick="testGoogleAPI()">
+                                🧪 Test Google API
+                            </button>
+                            <span id="google-test-result" style="margin-left: 10px;"></span>
                         </div>
                     </div>
 
@@ -247,6 +249,27 @@
             }
 
             saveSettings(data);
+        }
+
+        async function testGoogleAPI() {
+            const resultSpan = document.getElementById('google-test-result');
+            resultSpan.innerHTML = '<span style="color: #666;">Testing...</span>';
+
+            try {
+                const response = await fetch('/api/settings/test-google', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const result = await response.json();
+
+                if (result.valid) {
+                    resultSpan.innerHTML = '<span style="color: #34C759;">✓ ' + result.message + '</span>';
+                } else {
+                    resultSpan.innerHTML = '<span style="color: #FF3B30;">✗ ' + result.message + '</span>';
+                }
+            } catch (error) {
+                resultSpan.innerHTML = '<span style="color: #FF3B30;">✗ Error: ' + error.message + '</span>';
+            }
         }
 
         // Load settings on page load

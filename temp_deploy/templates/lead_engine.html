@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lead Engine - Jobs Pipeline</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/jobs_pipeline.css') }}">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-logo">
+            <div class="header-logo-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
+                </svg>
+            </div>
+            <span class="header-title">Jobs Pipeline</span>
+            <span class="header-subtitle">powered by Techgene</span>
+        </div>
+        <div class="header-actions">
+            <button class="header-btn" title="View Past Leads" onclick="showPastLeads()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <polyline points="12 6 12 12 16 14"/>
+                </svg>
+            </button>
+            <button class="header-btn" title="Settings">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <div class="app-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <button class="sidebar-toggle" onclick="toggleSidebar()" title="Menu">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="3" y1="12" x2="21" y2="12"/>
+                        <line x1="3" y1="6" x2="21" y2="6"/>
+                        <line x1="3" y1="18" x2="21" y2="18"/>
+                    </svg>
+                </button>
+                <button class="sidebar-collapse-btn" onclick="toggleSidebar()" title="Collapse">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="15 18 9 12 15 6"/>
+                    </svg>
+                </button>
+            </div>
+
+            <nav class="sidebar-nav">
+                <a href="/dashboard" class="nav-item">
+                    <span class="nav-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="7" height="9"/>
+                            <rect x="14" y="3" width="7" height="5"/>
+                            <rect x="14" y="12" width="7" height="9"/>
+                            <rect x="3" y="16" width="7" height="5"/>
+                        </svg>
+                    </span>
+                    <span class="nav-text">Dashboard</span>
+                </a>
+
+                <!-- Lead Engine with submenu -->
+                <div class="nav-group expanded">
+                    <div class="nav-item nav-group-header" onclick="toggleNavGroup(this)">
+                        <span class="nav-icon">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="3"/>
+                                <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4"/>
+                            </svg>
+                        </span>
+                        <span class="nav-text">Lead Engine</span>
+                        <span class="nav-arrow">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"/>
+                            </svg>
+                        </span>
+                    </div>
+                    <div class="nav-submenu">
+                        <a href="/lead-engine" class="nav-subitem active">
+                            <span class="nav-text">Lead Search</span>
+                        </a>
+                        <a href="/session-manager" class="nav-subitem">
+                            <span class="nav-text">Session Manager</span>
+                        </a>
+                    </div>
+                </div>
+
+                <a href="/campaign-manager" class="nav-item">
+                    <span class="nav-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                            <circle cx="9" cy="7" r="4"/>
+                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                        </svg>
+                    </span>
+                    <span class="nav-text">Campaign Manager</span>
+                </a>
+
+                <a href="/response-manager" class="nav-item">
+                    <span class="nav-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                        </svg>
+                    </span>
+                    <span class="nav-text">Response Manager</span>
+                </a>
+
+                <a href="/analytics" class="nav-item">
+                    <span class="nav-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="20" x2="18" y2="10"/>
+                            <line x1="12" y1="20" x2="12" y2="4"/>
+                            <line x1="6" y1="20" x2="6" y2="14"/>
+                        </svg>
+                    </span>
+                    <span class="nav-text">Analytics</span>
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content" id="main-content">
+            <!-- Session Header -->
+            <div class="session-header">
+                <label class="session-title-label">Session Title :</label>
+                <input type="text" class="session-title-input" id="session-title" placeholder="Enter session name..." value="">
+            </div>
+
+            <!-- Search Panel -->
+            <div class="search-panel">
+                <!-- Job Titles & Number of Jobs -->
+                <div class="search-row">
+                    <div class="search-group">
+                        <label class="search-label">Job Titles</label>
+                        <div class="search-input-wrapper">
+                            <span class="search-icon">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="11" cy="11" r="8"/>
+                                    <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                                </svg>
+                            </span>
+                            <input type="text" class="search-input" id="job-title-input" placeholder="Search for Job Titles here" onkeypress="handleJobTitleKeypress(event)">
+                        </div>
+                        <div class="tags-container" id="job-titles-tags"></div>
+                    </div>
+
+                    <div class="search-group">
+                        <label class="search-label">Number of Jobs</label>
+                        <input type="number" class="number-input" id="num-jobs" value="100" min="1" max="500">
+                    </div>
+                </div>
+
+                <!-- Advanced Options Toggle -->
+                <button class="advanced-toggle" id="advanced-toggle" onclick="toggleAdvanced()">
+                    Advanced Options
+                    <span class="arrow">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"/>
+                        </svg>
+                    </span>
+                </button>
+
+                <!-- Advanced Options Panel -->
+                <div class="advanced-options" id="advanced-options">
+                    <div class="advanced-grid">
+                        <!-- Left Column -->
+                        <div>
+                            <!-- Locations -->
+                            <div class="search-group" style="margin-bottom: 20px;">
+                                <label class="search-label">Locations</label>
+                                <div class="search-input-wrapper">
+                                    <span class="search-icon">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <circle cx="11" cy="11" r="8"/>
+                                            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                                        </svg>
+                                    </span>
+                                    <input type="text" class="search-input" id="location-input" placeholder="Search for Locations here" onkeypress="handleLocationKeypress(event)">
+                                </div>
+                                <div class="tags-container" id="locations-tags"></div>
+                            </div>
+
+                            <!-- Company Size -->
+                            <div class="search-group">
+                                <label class="search-label">Company Size</label>
+                                <div class="size-options">
+                                    <label class="size-option">
+                                        <input type="checkbox" id="size-small" value="small" checked>
+                                        <span>Small(1-50)</span>
+                                    </label>
+                                    <label class="size-option">
+                                        <input type="checkbox" id="size-mid" value="mid" checked>
+                                        <span>Mid(51-500)</span>
+                                    </label>
+                                    <label class="size-option">
+                                        <input type="checkbox" id="size-large" value="large" checked>
+                                        <span>Large(500+)</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right Column -->
+                        <div>
+                            <!-- Industries -->
+                            <div class="search-group" style="margin-bottom: 20px;">
+                                <label class="search-label">Industries</label>
+                                <div class="search-input-wrapper">
+                                    <span class="search-icon">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <circle cx="11" cy="11" r="8"/>
+                                            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                                        </svg>
+                                    </span>
+                                    <input type="text" class="search-input" id="industry-input" placeholder="Search for field here" onkeypress="handleIndustryKeypress(event)">
+                                </div>
+                                <div class="tags-container" id="industries-tags"></div>
+                            </div>
+
+                            <!-- Keywords -->
+                            <div class="search-group">
+                                <label class="search-label">Key Words</label>
+                                <div class="search-input-wrapper">
+                                    <span class="search-icon">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <circle cx="11" cy="11" r="8"/>
+                                            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                                        </svg>
+                                    </span>
+                                    <input type="text" class="search-input" id="keyword-input" placeholder="Search for Key Words here" onkeypress="handleKeywordKeypress(event)">
+                                </div>
+                                <div class="tags-container" id="keywords-tags"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Generate Button -->
+                <button class="generate-btn" id="generate-btn" onclick="generateLeads()">
+                    Generate Leads
+                </button>
+            </div>
+
+            <!-- Results Section -->
+            <div class="results-section" id="results-section" style="display: none;">
+                <div class="results-header">
+                    <h2 class="results-title">Lead Summary</h2>
+                    <div class="results-actions">
+                        <button class="action-btn action-btn-outline" onclick="saveToCRM()">Save to CRM</button>
+                        <button class="action-btn action-btn-outline" onclick="exportCSV()">Export CSV</button>
+                        <button class="action-btn action-btn-primary" onclick="sendToCampaign()">Send to Campaign</button>
+                    </div>
+                </div>
+
+                <table class="results-table">
+                    <thead>
+                        <tr>
+                            <th>Company</th>
+                            <th>Job Opening</th>
+                            <th>POC Name</th>
+                            <th>POC Title</th>
+                            <th>Email</th>
+                            <th>LinkedIn</th>
+                        </tr>
+                    </thead>
+                    <tbody id="results-body">
+                        <!-- Results populated by JavaScript -->
+                    </tbody>
+                </table>
+
+                <!-- Empty State -->
+                <div class="empty-state" id="empty-state" style="display: none;">
+                    <div class="empty-state-icon">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <circle cx="11" cy="11" r="8"/>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                        </svg>
+                    </div>
+                    <h3 class="empty-state-title">No leads found</h3>
+                    <p class="empty-state-text">Try adjusting your search criteria</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loading-overlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text" id="loading-text">Searching job openings...</div>
+        <div class="loading-progress">
+            <div class="loading-progress-bar" id="loading-progress" style="width: 0%"></div>
+        </div>
+    </div>
+
+    <!-- Past Leads Modal -->
+    <div class="modal-overlay" id="past-leads-modal" style="display: none;">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h2>📋 All Generated Leads (1,500+)</h2>
+                <button class="modal-close-btn" onclick="closePastLeads()">&times;</button>
+            </div>
+            <div class="modal-filters">
+                <input type="text" class="modal-search" id="past-leads-search" placeholder="Search by company, contact, title..." oninput="filterPastLeads()">
+                <select class="modal-filter-select" id="past-leads-status" onchange="filterPastLeads()">
+                    <option value="">All Leads</option>
+                    <option value="with_email">With Email</option>
+                    <option value="with_linkedin">With LinkedIn</option>
+                    <option value="ready">Ready</option>
+                    <option value="contacted">Contacted</option>
+                </select>
+            </div>
+            <div class="modal-stats" id="past-leads-stats">
+                <span class="stat-item">Total: <strong id="stat-total">0</strong></span>
+                <span class="stat-item">With Email: <strong id="stat-with-email">0</strong></span>
+                <span class="stat-item">With LinkedIn: <strong id="stat-contacted">0</strong></span>
+            </div>
+            <div class="modal-body">
+                <table class="past-leads-table">
+                    <thead>
+                        <tr>
+                            <th>Company</th>
+                            <th>Contact</th>
+                            <th>Email</th>
+                            <th>LinkedIn</th>
+                            <th>Created</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="past-leads-body">
+                        <tr><td colspan="6" class="loading-cell">Loading leads...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="modal-footer">
+                <button class="action-btn action-btn-outline" onclick="exportPastLeadsCSV()">📥 Export All CSV</button>
+                <button class="action-btn action-btn-outline" onclick="closePastLeads()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/lead_engine.js') }}"></script>
+</body>
+</html>

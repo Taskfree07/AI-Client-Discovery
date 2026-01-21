@@ -1,0 +1,6 @@
+<step title="Incoming Request" date="2026-01-08T13:02:42.886" instance="b08b79" url="/api/settings" method="POST" type="request" pid="768,1,7" Host="ai-client-discovery.scm.azurewebsites.net" User-Agent="Azure-WebSites-Controller/106.0.7.121" Authorization="Bas..." Content-Type="application/json" Expect="100-continue" Content-Length="28" x-ms-request-id="c2082ac6-631d-4ea3-89e3-b3db0aaf6185" X-ARR-LOG-ID="c2082ac6-631d-4ea3-89e3-b3db0aaf6185" CLIENT-IP="20.40.202.19:2881" X-SITE-DEPLOYMENT-ID="ai-client-discovery" WAS-DEFAULT-HOSTNAME="ai-client-discovery.scm.azurewebsites.net" X-MS-PLATFORM-INTERNAL="True" X-Forwarded-Proto="https" X-AppService-Proto="https" X-Forwarded-TlsVersion="1.3" X-WAWS-Unencoded-URL="/api/settings" X-Client-IP="20.40.202.19" X-Client-Port="2881" >
+  <step title="Acquiring Deployment Lock" date="2026-01-08T13:02:43.751" /><!-- duration: 10ms -->
+  <step title="Acquired Deployment Lock" date="2026-01-08T13:02:43.808" /><!-- duration: 4ms -->
+  <step title="Releasing Deployment Lock" date="2026-01-08T13:02:43.888" /><!-- duration: 4ms -->
+  <step title="Outgoing response" date="2026-01-08T13:02:43.908" type="response" statusCode="204" statusText="NoContent" /><!-- duration: 6ms -->
+</step><!-- duration: 1031ms -->
