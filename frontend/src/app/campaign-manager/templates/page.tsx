@@ -96,7 +96,7 @@ export default function TemplatesPage() {
                   <strong>Subject:</strong> {template.subject}
                 </div>
                 <div className="template-preview">
-                  {template.body.substring(0, 150)}...
+                  {template.body ? template.body.substring(0, 150) : 'No preview available'}...
                 </div>
               </div>
               <div className="template-card-footer">

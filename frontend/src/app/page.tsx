@@ -24,15 +24,39 @@ export default function HomePage() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const [campaignsRes, leadsRes, logsRes] = await Promise.all([
-          fetch('/api/campaigns'),
-          fetch('/api/leads'),
-          fetch('/api/logs'),
-        ])
+        let campaignsData: any[] = []
+        let leadsData: any[] = []
+        let logsData: any[] = []
 
-        const campaignsData = await campaignsRes.json()
-        const leadsData = await leadsRes.json()
-        const logsData = await logsRes.json()
+        try {
+          const campaignsRes = await fetch('/api/campaigns')
+          if (campaignsRes.ok) {
+            const data = await campaignsRes.json()
+            campaignsData = Array.isArray(data) ? data : []
+          }
+        } catch (error) {
+          console.error('Error fetching campaigns:', error)
+        }
+
+        try {
+          const leadsRes = await fetch('/api/leads')
+          if (leadsRes.ok) {
+            const data = await leadsRes.json()
+            leadsData = Array.isArray(data) ? data : []
+          }
+        } catch (error) {
+          console.error('Error fetching leads:', error)
+        }
+
+        try {
+          const logsRes = await fetch('/api/logs')
+          if (logsRes.ok) {
+            const data = await logsRes.json()
+            logsData = Array.isArray(data) ? data : []
+          }
+        } catch (error) {
+          console.error('Error fetching logs:', error)
+        }
 
         setStats({
           totalCampaigns: campaignsData.length || 0,
@@ -55,147 +79,187 @@ export default function HomePage() {
 
   return (
     <MainLayout>
-      <div className="page-header">
-        <h1 className="page-title">Dashboard</h1>
-        <p className="page-subtitle">Automated recruitment campaign management</p>
-      </div>
-
-      {/* Stats Grid */}
-      <div className="stats-grid">
-        <div className="stat-card">
-          <div className="stat-header">
-            <span className="stat-title">Total Campaigns</span>
-            <div className="stat-icon primary">
-              <i className="fas fa-clipboard-list"></i>
-            </div>
+      <div className="dashboard-page">
+        <div className="page-header">
+          <div className="page-header-content">
+            <h1 className="page-title">Dashboard</h1>
+            <p className="page-subtitle">Overview of your outreach campaigns and leads</p>
           </div>
-          <div className="stat-value">{stats.totalCampaigns}</div>
+          <div className="page-header-actions">
+            <button className="btn-secondary">
+              <i className="fas fa-download"></i>
+              Export Report
+            </button>
+            <a href="/campaign-manager/new" className="btn-primary">
+              <i className="fas fa-plus"></i>
+              New Campaign
+            </a>
+          </div>
         </div>
 
-        <div className="stat-card">
-          <div className="stat-header">
-            <span className="stat-title">Active Campaigns</span>
-            <div className="stat-icon success">
-              <i className="fas fa-check-circle"></i>
+        {/* Stats Grid */}
+        <div className="dashboard-stats-grid">
+          <div className="dashboard-stat-card">
+            <div className="dashboard-stat-icon blue">
+              <i className="fas fa-bullhorn"></i>
+            </div>
+            <div className="dashboard-stat-content">
+              <span className="dashboard-stat-value">{stats.totalCampaigns}</span>
+              <span className="dashboard-stat-label">Total Campaigns</span>
             </div>
           </div>
-          <div className="stat-value">{stats.activeCampaigns}</div>
-        </div>
 
-        <div className="stat-card">
-          <div className="stat-header">
-            <span className="stat-title">Total Leads</span>
-            <div className="stat-icon secondary">
+          <div className="dashboard-stat-card">
+            <div className="dashboard-stat-icon green">
+              <i className="fas fa-play-circle"></i>
+            </div>
+            <div className="dashboard-stat-content">
+              <span className="dashboard-stat-value">{stats.activeCampaigns}</span>
+              <span className="dashboard-stat-label">Active Campaigns</span>
+            </div>
+          </div>
+
+          <div className="dashboard-stat-card">
+            <div className="dashboard-stat-icon purple">
               <i className="fas fa-users"></i>
             </div>
-          </div>
-          <div className="stat-value">{stats.totalLeads}</div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-header">
-            <span className="stat-title">Emails Sent</span>
-            <div className="stat-icon warning">
-              <i className="fas fa-envelope"></i>
+            <div className="dashboard-stat-content">
+              <span className="dashboard-stat-value">{stats.totalLeads}</span>
+              <span className="dashboard-stat-label">Total Leads</span>
             </div>
           </div>
-          <div className="stat-value">{stats.emailsSent}</div>
-        </div>
-      </div>
 
-      {/* Campaigns Card */}
-      <div className="card">
-        <div className="card-header">
-          <h2 className="card-title">Campaigns</h2>
+          <div className="dashboard-stat-card">
+            <div className="dashboard-stat-icon orange">
+              <i className="fas fa-paper-plane"></i>
+            </div>
+            <div className="dashboard-stat-content">
+              <span className="dashboard-stat-value">{stats.emailsSent}</span>
+              <span className="dashboard-stat-label">Emails Sent</span>
+            </div>
+          </div>
         </div>
 
-        <div className="table-container">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Keywords</th>
-                <th>Status</th>
-                <th>Created</th>
-              </tr>
-            </thead>
-            <tbody>
+        {/* Two Column Layout */}
+        <div className="dashboard-grid-2">
+          {/* Campaigns Card */}
+          <div className="dashboard-card">
+            <div className="dashboard-card-header">
+              <h2 className="dashboard-card-title">
+                <i className="fas fa-clipboard-list"></i>
+                Recent Campaigns
+              </h2>
+              <a href="/campaign-manager" className="dashboard-card-link">View All</a>
+            </div>
+
+            <div className="dashboard-card-body">
               {loading ? (
-                <tr>
-                  <td colSpan={4} style={{ textAlign: 'center', padding: '2rem' }}>
-                    <div className="loading"></div> Loading campaigns...
-                  </td>
-                </tr>
+                <div className="dashboard-loading">
+                  <div className="loading-spinner"></div>
+                  <span>Loading campaigns...</span>
+                </div>
               ) : campaigns.length === 0 ? (
-                <tr>
-                  <td colSpan={4} style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>
-                    No campaigns yet. Start your first campaign from the Campaign Manager.
-                  </td>
-                </tr>
+                <div className="dashboard-empty">
+                  <i className="fas fa-inbox"></i>
+                  <p>No campaigns yet</p>
+                  <a href="/campaign-manager/new" className="btn-primary btn-sm">Create Campaign</a>
+                </div>
               ) : (
-                campaigns.map((campaign) => (
-                  <tr key={campaign.id}>
-                    <td>{campaign.name}</td>
-                    <td>{campaign.search_keywords}</td>
-                    <td>
-                      <span className={`badge badge-${campaign.status === 'active' ? 'success' : 'secondary'}`}>
+                <div className="dashboard-list">
+                  {campaigns.slice(0, 5).map((campaign) => (
+                    <div key={campaign.id} className="dashboard-list-item">
+                      <div className="dashboard-list-item-info">
+                        <span className="dashboard-list-item-name">{campaign.name}</span>
+                        <span className="dashboard-list-item-meta">{campaign.search_keywords}</span>
+                      </div>
+                      <span className={`status-badge ${campaign.status}`}>
                         {campaign.status}
                       </span>
-                    </td>
-                    <td>{new Date(campaign.created_at).toLocaleDateString()}</td>
-                  </tr>
-                ))
+                    </div>
+                  ))}
+                </div>
               )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+            </div>
+          </div>
 
-      {/* Recent Activity */}
-      <div className="card">
-        <div className="card-header">
-          <h2 className="card-title">Recent Activity</h2>
-        </div>
+          {/* Recent Activity Card */}
+          <div className="dashboard-card">
+            <div className="dashboard-card-header">
+              <h2 className="dashboard-card-title">
+                <i className="fas fa-clock"></i>
+                Recent Activity
+              </h2>
+              <a href="/analytics" className="dashboard-card-link">View All</a>
+            </div>
 
-        <div className="table-container">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Time</th>
-                <th>Action</th>
-                <th>Details</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
+            <div className="dashboard-card-body">
               {loading ? (
-                <tr>
-                  <td colSpan={4} style={{ textAlign: 'center', padding: '2rem' }}>
-                    <div className="loading"></div> Loading logs...
-                  </td>
-                </tr>
+                <div className="dashboard-loading">
+                  <div className="loading-spinner"></div>
+                  <span>Loading activity...</span>
+                </div>
               ) : logs.length === 0 ? (
-                <tr>
-                  <td colSpan={4} style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>
-                    No recent activity
-                  </td>
-                </tr>
+                <div className="dashboard-empty">
+                  <i className="fas fa-history"></i>
+                  <p>No recent activity</p>
+                </div>
               ) : (
-                logs.slice(0, 10).map((log: any) => (
-                  <tr key={log.id}>
-                    <td>{new Date(log.created_at).toLocaleString()}</td>
-                    <td>{log.action?.replace(/_/g, ' ')}</td>
-                    <td>{log.details}</td>
-                    <td>
-                      <span className={`badge badge-${log.status === 'success' ? 'success' : log.status === 'error' ? 'warning' : 'secondary'}`}>
-                        {log.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))
+                <div className="dashboard-activity-list">
+                  {logs.slice(0, 5).map((log: any) => (
+                    <div key={log.id} className="dashboard-activity-item">
+                      <div className={`activity-icon ${log.status}`}>
+                        <i className={`fas ${log.status === 'success' ? 'fa-check' : log.status === 'error' ? 'fa-times' : 'fa-info'}`}></i>
+                      </div>
+                      <div className="activity-content">
+                        <span className="activity-action">{log.action?.replace(/_/g, ' ')}</span>
+                        <span className="activity-time">{new Date(log.created_at).toLocaleString()}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
-            </tbody>
-          </table>
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="dashboard-card">
+          <div className="dashboard-card-header">
+            <h2 className="dashboard-card-title">
+              <i className="fas fa-bolt"></i>
+              Quick Actions
+            </h2>
+          </div>
+          <div className="dashboard-quick-actions">
+            <a href="/lead-engine/search" className="quick-action-card">
+              <div className="quick-action-icon blue">
+                <i className="fas fa-search"></i>
+              </div>
+              <span className="quick-action-title">Search Leads</span>
+              <span className="quick-action-desc">Find new prospects</span>
+            </a>
+            <a href="/campaign-manager/new" className="quick-action-card">
+              <div className="quick-action-icon green">
+                <i className="fas fa-plus"></i>
+              </div>
+              <span className="quick-action-title">New Campaign</span>
+              <span className="quick-action-desc">Start outreach</span>
+            </a>
+            <a href="/campaign-manager/templates" className="quick-action-card">
+              <div className="quick-action-icon purple">
+                <i className="fas fa-file-alt"></i>
+              </div>
+              <span className="quick-action-title">Email Templates</span>
+              <span className="quick-action-desc">Manage templates</span>
+            </a>
+            <a href="/analytics" className="quick-action-card">
+              <div className="quick-action-icon orange">
+                <i className="fas fa-chart-bar"></i>
+              </div>
+              <span className="quick-action-title">Analytics</span>
+              <span className="quick-action-desc">View performance</span>
+            </a>
+          </div>
         </div>
       </div>
     </MainLayout>

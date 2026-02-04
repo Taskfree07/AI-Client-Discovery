@@ -87,7 +87,10 @@
       "Bash(.venvScriptspip install -r requirements.txt)",
       "Bash(venv/Scripts/python.exe -m pip install:*)",
       "Bash(venv/Scripts/python.exe:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(npm run build:*)",
+      "Bash(az:*)",
+      "Bash(set AZURE_CLI_DISABLE_CONNECTION_VERIFICATION=1)"
     ],
     "deny": [],
     "ask": []

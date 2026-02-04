@@ -1,474 +1,586 @@
 'use client'
 
 import MainLayout from '@/components/MainLayout'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+
+interface Session {
+  id: number
+  title: string
+  created_at: string
+  lead_count: number
+  job_titles: string[]
+}
+
+interface Template {
+  id: number
+  name: string
+  subject: string
+  body: string
+  category: string
+}
 
 interface CampaignFormData {
   campaign_name: string
-  campaign_type: string
-  campaign_description: string
-  job_title: string
-  industries: string
-  company_size_min: string
-  company_size_max: string
-  location: string
-  email_template: string
-  sender_name: string
-  follow_up_delay: number
-  max_follow_ups: number
+  selected_session_id: number | null
+  selected_template_id: number | null
+  // Schedule
   start_date: string
-  daily_limit: number
-  send_weekdays: boolean
-  send_business_hours: boolean
-  stop_on_reply: boolean
-  stop_on_unsubscribe: boolean
-  stop_on_bounce: boolean
-  priority: string
-  status: string
+  end_date: string
+  from_time: string
+  from_period: 'am' | 'pm'
+  to_time: string
+  to_period: 'am' | 'pm'
+  sending_days: string[]
+  max_mails_per_day: number
+  interval_between_mails: number
 }
 
-export default function NewCampaignPage() {
+const STEPS = [
+  { id: 1, name: 'Add Leads', key: 'leads' },
+  { id: 2, name: 'Create Campaign Mail', key: 'mail' },
+  { id: 3, name: 'Schedule', key: 'schedule' },
+  { id: 4, name: 'Review and launch', key: 'review' }
+]
+
+const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+
+export default function CampaignBuilderPage() {
   const router = useRouter()
+  const [currentStep, setCurrentStep] = useState(1)
+  const [sessions, setSessions] = useState<Session[]>([])
+  const [templates, setTemplates] = useState<Template[]>([])
+  const [loadingSessions, setLoadingSessions] = useState(true)
+  const [loadingTemplates, setLoadingTemplates] = useState(true)
+
   const [formData, setFormData] = useState<CampaignFormData>({
     campaign_name: '',
-    campaign_type: '',
-    campaign_description: '',
-    job_title: '',
-    industries: '',
-    company_size_min: '',
-    company_size_max: '',
-    location: '',
-    email_template: '',
-    sender_name: '',
-    follow_up_delay: 2,
-    max_follow_ups: 2,
+    selected_session_id: null,
+    selected_template_id: null,
     start_date: '',
-    daily_limit: 50,
-    send_weekdays: true,
-    send_business_hours: true,
-    stop_on_reply: true,
-    stop_on_unsubscribe: true,
-    stop_on_bounce: true,
-    priority: 'normal',
-    status: 'active'
+    end_date: '',
+    from_time: '09:10',
+    from_period: 'am',
+    to_time: '12:00',
+    to_period: 'pm',
+    sending_days: [],
+    max_mails_per_day: 99,
+    interval_between_mails: 3
   })
 
-  const handleSubmit = async (e: React.FormEvent, saveAsDraft = false) => {
-    e.preventDefault()
+  useEffect(() => {
+    loadSessions()
+    loadTemplates()
+  }, [])
 
-    const dataToSubmit = {
-      ...formData,
-      status: saveAsDraft ? 'draft' : formData.status
+  const loadSessions = async () => {
+    try {
+      const response = await fetch('/api/sessions')
+      if (response.ok) {
+        const data = await response.json()
+        if (Array.isArray(data)) {
+          setSessions(data)
+        } else if (data && Array.isArray(data.sessions)) {
+          setSessions(data.sessions)
+        }
+      }
+    } catch (error) {
+      console.error('Error loading sessions:', error)
+    } finally {
+      setLoadingSessions(false)
     }
+  }
 
+  const loadTemplates = async () => {
+    try {
+      const response = await fetch('/api/templates')
+      if (response.ok) {
+        const data = await response.json()
+        setTemplates(Array.isArray(data) ? data : [])
+      }
+    } catch (error) {
+      console.error('Error loading templates:', error)
+    } finally {
+      setLoadingTemplates(false)
+    }
+  }
+
+  const handleNext = () => {
+    if (currentStep < 4) {
+      setCurrentStep(currentStep + 1)
+    }
+  }
+
+  const handleBack = () => {
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1)
+    }
+  }
+
+  const handleSaveDraft = async () => {
     try {
       const response = await fetch('/api/campaigns', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(dataToSubmit)
+        body: JSON.stringify({ ...formData, status: 'draft' })
       })
-
       if (response.ok) {
-        alert(saveAsDraft ? 'Campaign saved as draft!' : 'Campaign launched successfully!')
+        alert('Campaign saved as draft!')
         router.push('/campaign-manager')
-      } else {
-        alert('Error creating campaign')
       }
     } catch (error) {
-      console.error('Error:', error)
-      alert('Error creating campaign')
+      console.error('Error saving draft:', error)
+      alert('Error saving draft')
     }
   }
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value, type } = e.target
-    const checked = (e.target as HTMLInputElement).checked
+  const handleLaunch = async () => {
+    try {
+      const response = await fetch('/api/campaigns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...formData, status: 'active' })
+      })
+      if (response.ok) {
+        alert('Campaign launched successfully!')
+        router.push('/campaign-manager')
+      }
+    } catch (error) {
+      console.error('Error launching campaign:', error)
+      alert('Error launching campaign')
+    }
+  }
 
+  const toggleDay = (day: string) => {
     setFormData(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value
+      sending_days: prev.sending_days.includes(day)
+        ? prev.sending_days.filter(d => d !== day)
+        : [...prev.sending_days, day]
     }))
   }
 
+  const selectedSession = sessions.find(s => s.id === formData.selected_session_id)
+  const selectedTemplate = templates.find(t => t.id === formData.selected_template_id)
+
   return (
     <MainLayout>
-      <div className="page-header">
-        <h1 className="page-title">Start New Campaign</h1>
-        <p className="page-subtitle">Set up your automated outreach campaign with rules and targeting</p>
+      <div className="campaign-builder">
+        {/* Header */}
+        <div className="builder-header">
+          <div className="builder-header-left">
+            <h1 className="page-title">Create Campaign</h1>
+            <p className="page-subtitle">Create and manage multi-channel outreach campaigns</p>
+          </div>
+          <div className="builder-header-right">
+            <button className="btn-save-draft" onClick={handleSaveDraft}>
+              <i className="far fa-save"></i>
+              Save draft
+            </button>
+          </div>
+        </div>
+
+        {/* Campaign Name */}
+        <div className="campaign-name-section">
+          <label className="form-label">Campaign Name</label>
+          <input
+            type="text"
+            className="form-input"
+            placeholder="Enter The Campaign Name Here"
+            value={formData.campaign_name}
+            onChange={(e) => setFormData(prev => ({ ...prev, campaign_name: e.target.value }))}
+          />
+        </div>
+
+        {/* Steps Progress */}
+        <div className="steps-container">
+          <div className="steps-header">
+            {STEPS.map((step, index) => (
+              <div 
+                key={step.id} 
+                className={`step-item ${currentStep >= step.id ? 'active' : ''} ${currentStep === step.id ? 'current' : ''}`}
+                onClick={() => setCurrentStep(step.id)}
+              >
+                <span className="step-name">{step.name}</span>
+              </div>
+            ))}
+          </div>
+          <div className="steps-progress-bar">
+            <div 
+              className="steps-progress-fill" 
+              style={{ width: `${((currentStep - 1) / (STEPS.length - 1)) * 100}%` }}
+            ></div>
+            {STEPS.map((step, index) => (
+              <div 
+                key={step.id}
+                className={`step-dot ${currentStep >= step.id ? 'active' : ''}`}
+                style={{ left: `${(index / (STEPS.length - 1)) * 100}%` }}
+              ></div>
+            ))}
+          </div>
+        </div>
+
+        {/* Step Content */}
+        <div className="step-content">
+          {/* Step 1: Add Leads */}
+          {currentStep === 1 && (
+            <div className="step-panel">
+              <h2 className="step-title">Add Leads</h2>
+              <div className="leads-options">
+                <div 
+                  className="lead-option-card"
+                  onClick={() => document.getElementById('csv-upload')?.click()}
+                >
+                  <div className="lead-option-icon blue">
+                    <i className="fas fa-upload"></i>
+                  </div>
+                  <h3 className="lead-option-title">Upload CSV</h3>
+                  <p className="lead-option-desc">
+                    Upload a CSV file containing your leads. Make sure it includes email, name, and company details.
+                  </p>
+                  <input type="file" id="csv-upload" accept=".csv" hidden />
+                </div>
+
+                <div 
+                  className={`lead-option-card ${formData.selected_session_id ? 'selected' : ''}`}
+                >
+                  <div className="lead-option-icon purple">
+                    <i className="fas fa-cog"></i>
+                  </div>
+                  <h3 className="lead-option-title">Import from Lead Engine</h3>
+                  <p className="lead-option-desc">
+                    Select a session from Lead Engine to import leads directly.
+                  </p>
+                  {loadingSessions ? (
+                    <div className="loading-text">Loading sessions...</div>
+                  ) : sessions.length > 0 ? (
+                    <select
+                      className="session-select"
+                      value={formData.selected_session_id || ''}
+                      onChange={(e) => setFormData(prev => ({ 
+                        ...prev, 
+                        selected_session_id: e.target.value ? parseInt(e.target.value) : null 
+                      }))}
+                    >
+                      <option value="">Select a session...</option>
+                      {sessions.map(session => (
+                        <option key={session.id} value={session.id}>
+                          {session.title} ({session.lead_count} leads)
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <p className="no-data-text">No sessions available. Generate leads first.</p>
+                  )}
+                </div>
+
+                <div className="lead-option-card">
+                  <div className="lead-option-icon gray">
+                    <i className="fas fa-plus"></i>
+                  </div>
+                  <h3 className="lead-option-title">Add Manual</h3>
+                  <p className="lead-option-desc">
+                    Manually add leads one by one with email, name, and company details.
+                  </p>
+                </div>
+              </div>
+
+              {selectedSession && (
+                <div className="selected-info-box">
+                  <i className="fas fa-check-circle"></i>
+                  <span>Selected: <strong>{selectedSession.title}</strong> with {selectedSession.lead_count} leads</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Step 2: Create Campaign Mail */}
+          {currentStep === 2 && (
+            <div className="step-panel">
+              <h2 className="step-title">Create Campaign Mail</h2>
+              <p className="step-description">Select an email template for your campaign</p>
+
+              {loadingTemplates ? (
+                <div className="loading-container">
+                  <div className="loading-spinner"></div>
+                  <p>Loading templates...</p>
+                </div>
+              ) : templates.length > 0 ? (
+                <div className="templates-grid">
+                  {templates.map(template => (
+                    <div 
+                      key={template.id} 
+                      className={`template-select-card ${formData.selected_template_id === template.id ? 'selected' : ''}`}
+                      onClick={() => setFormData(prev => ({ ...prev, selected_template_id: template.id }))}
+                    >
+                      <div className="template-select-header">
+                        <h3 className="template-select-title">{template.name}</h3>
+                        {formData.selected_template_id === template.id && (
+                          <i className="fas fa-check-circle selected-icon"></i>
+                        )}
+                      </div>
+                      <div className="template-select-subject">
+                        <strong>Subject:</strong> {template.subject}
+                      </div>
+                      <div className="template-select-preview">
+                        {template.body ? template.body.substring(0, 100) : 'No preview available'}...
+                      </div>
+                      <span className="template-category-badge">{template.category}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="empty-state-card">
+                  <div className="empty-state-icon">
+                    <i className="fas fa-envelope"></i>
+                  </div>
+                  <h3 className="empty-state-title">No Templates Available</h3>
+                  <p className="empty-state-description">
+                    Create email templates first to use in your campaigns.
+                  </p>
+                  <a href="/campaign-manager/templates" className="btn-primary">
+                    <i className="fas fa-plus"></i>
+                    Create Template
+                  </a>
+                </div>
+              )}
+
+              {selectedTemplate && (
+                <div className="selected-info-box">
+                  <i className="fas fa-check-circle"></i>
+                  <span>Selected template: <strong>{selectedTemplate.name}</strong></span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Step 3: Schedule */}
+          {currentStep === 3 && (
+            <div className="step-panel">
+              <h2 className="step-title">Schedule</h2>
+
+              <div className="schedule-section">
+                <h3 className="schedule-section-title">Dates and Time</h3>
+                <div className="schedule-row">
+                  <div className="schedule-field">
+                    <label className="schedule-label">Start date</label>
+                    <input
+                      type="date"
+                      className="schedule-input"
+                      placeholder="DD/MM/YYYY"
+                      value={formData.start_date}
+                      onChange={(e) => setFormData(prev => ({ ...prev, start_date: e.target.value }))}
+                    />
+                  </div>
+                  <div className="schedule-field">
+                    <label className="schedule-label">End date</label>
+                    <input
+                      type="date"
+                      className="schedule-input"
+                      placeholder="DD/MM/YYYY"
+                      value={formData.end_date}
+                      onChange={(e) => setFormData(prev => ({ ...prev, end_date: e.target.value }))}
+                    />
+                  </div>
+                </div>
+
+                <div className="schedule-row">
+                  <div className="schedule-field">
+                    <label className="schedule-label">From</label>
+                    <div className="time-input-group">
+                      <input
+                        type="text"
+                        className="time-input"
+                        placeholder="09:10"
+                        value={formData.from_time}
+                        onChange={(e) => setFormData(prev => ({ ...prev, from_time: e.target.value }))}
+                      />
+                      <select
+                        className="period-select"
+                        value={formData.from_period}
+                        onChange={(e) => setFormData(prev => ({ ...prev, from_period: e.target.value as 'am' | 'pm' }))}
+                      >
+                        <option value="am">am</option>
+                        <option value="pm">pm</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="schedule-field">
+                    <label className="schedule-label">To</label>
+                    <div className="time-input-group">
+                      <input
+                        type="text"
+                        className="time-input"
+                        placeholder="12:00"
+                        value={formData.to_time}
+                        onChange={(e) => setFormData(prev => ({ ...prev, to_time: e.target.value }))}
+                      />
+                      <select
+                        className="period-select"
+                        value={formData.to_period}
+                        onChange={(e) => setFormData(prev => ({ ...prev, to_period: e.target.value as 'am' | 'pm' }))}
+                      >
+                        <option value="am">am</option>
+                        <option value="pm">pm</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="schedule-section">
+                <h3 className="schedule-section-title">Sending Days</h3>
+                <div className="days-grid">
+                  {DAYS.map(day => (
+                    <label key={day} className="day-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={formData.sending_days.includes(day)}
+                        onChange={() => toggleDay(day)}
+                      />
+                      <span className="day-label">{day}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="schedule-section">
+                <h3 className="schedule-section-title">Daily Sending Limit</h3>
+                <div className="schedule-row">
+                  <div className="schedule-field">
+                    <label className="schedule-label">Maximum Mails per day</label>
+                    <input
+                      type="number"
+                      className="schedule-input small"
+                      value={formData.max_mails_per_day}
+                      onChange={(e) => setFormData(prev => ({ ...prev, max_mails_per_day: parseInt(e.target.value) || 0 }))}
+                    />
+                  </div>
+                  <div className="schedule-field">
+                    <label className="schedule-label">Interval between mails</label>
+                    <div className="interval-input-group">
+                      <input
+                        type="number"
+                        className="schedule-input small"
+                        value={formData.interval_between_mails}
+                        onChange={(e) => setFormData(prev => ({ ...prev, interval_between_mails: parseInt(e.target.value) || 0 }))}
+                      />
+                      <span className="interval-unit">min</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Step 4: Review and Launch */}
+          {currentStep === 4 && (
+            <div className="step-panel">
+              <h2 className="step-title">Review and Launch</h2>
+              <p className="step-description">Review your campaign settings before launching</p>
+
+              <div className="review-sections">
+                <div className="review-card">
+                  <h3 className="review-card-title">
+                    <i className="fas fa-info-circle"></i>
+                    Campaign Details
+                  </h3>
+                  <div className="review-item">
+                    <span className="review-label">Campaign Name:</span>
+                    <span className="review-value">{formData.campaign_name || 'Not set'}</span>
+                  </div>
+                </div>
+
+                <div className="review-card">
+                  <h3 className="review-card-title">
+                    <i className="fas fa-users"></i>
+                    Leads
+                  </h3>
+                  <div className="review-item">
+                    <span className="review-label">Source:</span>
+                    <span className="review-value">
+                      {selectedSession ? `${selectedSession.title} (${selectedSession.lead_count} leads)` : 'Not selected'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="review-card">
+                  <h3 className="review-card-title">
+                    <i className="fas fa-envelope"></i>
+                    Email Template
+                  </h3>
+                  <div className="review-item">
+                    <span className="review-label">Template:</span>
+                    <span className="review-value">{selectedTemplate?.name || 'Not selected'}</span>
+                  </div>
+                  {selectedTemplate && (
+                    <div className="review-item">
+                      <span className="review-label">Subject:</span>
+                      <span className="review-value">{selectedTemplate.subject}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="review-card">
+                  <h3 className="review-card-title">
+                    <i className="fas fa-calendar"></i>
+                    Schedule
+                  </h3>
+                  <div className="review-item">
+                    <span className="review-label">Date Range:</span>
+                    <span className="review-value">
+                      {formData.start_date && formData.end_date 
+                        ? `${formData.start_date} to ${formData.end_date}` 
+                        : 'Not set'}
+                    </span>
+                  </div>
+                  <div className="review-item">
+                    <span className="review-label">Time:</span>
+                    <span className="review-value">
+                      {formData.from_time} {formData.from_period} - {formData.to_time} {formData.to_period}
+                    </span>
+                  </div>
+                  <div className="review-item">
+                    <span className="review-label">Days:</span>
+                    <span className="review-value">
+                      {formData.sending_days.length > 0 ? formData.sending_days.join(', ') : 'None selected'}
+                    </span>
+                  </div>
+                  <div className="review-item">
+                    <span className="review-label">Daily Limit:</span>
+                    <span className="review-value">{formData.max_mails_per_day} emails/day</span>
+                  </div>
+                  <div className="review-item">
+                    <span className="review-label">Interval:</span>
+                    <span className="review-value">{formData.interval_between_mails} minutes</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Navigation Buttons */}
+        <div className="builder-footer">
+          {currentStep > 1 && (
+            <button className="btn-secondary" onClick={handleBack}>
+              Back
+            </button>
+          )}
+          <div className="footer-right">
+            {currentStep < 4 ? (
+              <button className="btn-primary" onClick={handleNext}>
+                Save and Next
+              </button>
+            ) : (
+              <button className="btn-primary btn-green" onClick={handleLaunch}>
+                <i className="fas fa-rocket"></i>
+                Launch Campaign
+              </button>
+            )}
+          </div>
+        </div>
       </div>
-
-      <form onSubmit={(e) => handleSubmit(e, false)}>
-        <div className="form-section">
-          <h3 className="section-title">
-            <i className="fas fa-info-circle"></i>
-            Campaign Details
-          </h3>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label className="form-label" htmlFor="campaign_name">Campaign Name *</label>
-              <input
-                type="text"
-                id="campaign_name"
-                name="campaign_name"
-                className="form-input"
-                required
-                placeholder="e.g., AI Developer Outreach Q1"
-                value={formData.campaign_name}
-                onChange={handleChange}
-              />
-              <div className="form-hint">Choose a descriptive name for your campaign</div>
-            </div>
-
-            <div className="form-group">
-              <label className="form-label" htmlFor="campaign_type">Campaign Type *</label>
-              <select
-                id="campaign_type"
-                name="campaign_type"
-                className="form-select"
-                required
-                value={formData.campaign_type}
-                onChange={handleChange}
-              >
-                <option value="">Select type</option>
-                <option value="email">Email Only</option>
-                <option value="linkedin">LinkedIn Only</option>
-                <option value="multi">Multi-Channel</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="form-row full">
-            <div className="form-group">
-              <label className="form-label" htmlFor="campaign_description">Description</label>
-              <textarea
-                id="campaign_description"
-                name="campaign_description"
-                className="form-textarea"
-                placeholder="Describe the goal of this campaign..."
-                value={formData.campaign_description}
-                onChange={handleChange}
-              ></textarea>
-            </div>
-          </div>
-        </div>
-
-        <div className="form-section">
-          <h3 className="section-title">
-            <i className="fas fa-filter"></i>
-            Targeting Rules
-          </h3>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label className="form-label" htmlFor="job_title">Target Job Titles</label>
-              <input
-                type="text"
-                id="job_title"
-                name="job_title"
-                className="form-input"
-                placeholder="e.g., CTO, VP Engineering, Tech Lead"
-                value={formData.job_title}
-                onChange={handleChange}
-              />
-              <div className="form-hint">Comma-separated list of job titles</div>
-            </div>
-
-            <div className="form-group">
-              <label className="form-label" htmlFor="industries">Industries</label>
-              <input
-                type="text"
-                id="industries"
-                name="industries"
-                className="form-input"
-                placeholder="e.g., SaaS, FinTech, Healthcare"
-                value={formData.industries}
-                onChange={handleChange}
-              />
-              <div className="form-hint">Comma-separated list of industries</div>
-            </div>
-          </div>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label className="form-label" htmlFor="company_size_min">Min Company Size</label>
-              <input
-                type="number"
-                id="company_size_min"
-                name="company_size_min"
-                className="form-input"
-                placeholder="50"
-                min="1"
-                value={formData.company_size_min}
-                onChange={handleChange}
-              />
-              <div className="form-hint">Minimum number of employees</div>
-            </div>
-
-            <div className="form-group">
-              <label className="form-label" htmlFor="company_size_max">Max Company Size</label>
-              <input
-                type="number"
-                id="company_size_max"
-                name="company_size_max"
-                className="form-input"
-                placeholder="500"
-                min="1"
-                value={formData.company_size_max}
-                onChange={handleChange}
-              />
-              <div className="form-hint">Maximum number of employees</div>
-            </div>
-          </div>
-
-          <div className="form-row full">
-            <div className="form-group">
-              <label className="form-label" htmlFor="location">Location</label>
-              <input
-                type="text"
-                id="location"
-                name="location"
-                className="form-input"
-                placeholder="e.g., United States, UK, Remote"
-                value={formData.location}
-                onChange={handleChange}
-              />
-              <div className="form-hint">Target geographic location</div>
-            </div>
-          </div>
-        </div>
-
-        <div className="form-section">
-          <h3 className="section-title">
-            <i className="fas fa-envelope"></i>
-            Email Sequence Settings
-          </h3>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label className="form-label" htmlFor="email_template">Email Template *</label>
-              <select
-                id="email_template"
-                name="email_template"
-                className="form-select"
-                required
-                value={formData.email_template}
-                onChange={handleChange}
-              >
-                <option value="">Select template</option>
-                <option value="intro">Introduction</option>
-                <option value="value_prop">Value Proposition</option>
-                <option value="case_study">Case Study</option>
-                <option value="custom">Custom Template</option>
-              </select>
-            </div>
-
-            <div className="form-group">
-              <label className="form-label" htmlFor="sender_name">Sender Name *</label>
-              <input
-                type="text"
-                id="sender_name"
-                name="sender_name"
-                className="form-input"
-                required
-                placeholder="Your Name"
-                value={formData.sender_name}
-                onChange={handleChange}
-              />
-            </div>
-          </div>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label className="form-label" htmlFor="follow_up_delay">Follow-up Delay (days)</label>
-              <input
-                type="number"
-                id="follow_up_delay"
-                name="follow_up_delay"
-                className="form-input"
-                min="1"
-                max="14"
-                value={formData.follow_up_delay}
-                onChange={handleChange}
-              />
-              <div className="form-hint">Days to wait before sending follow-up</div>
-            </div>
-
-            <div className="form-group">
-              <label className="form-label" htmlFor="max_follow_ups">Max Follow-ups</label>
-              <input
-                type="number"
-                id="max_follow_ups"
-                name="max_follow_ups"
-                className="form-input"
-                min="0"
-                max="5"
-                value={formData.max_follow_ups}
-                onChange={handleChange}
-              />
-              <div className="form-hint">Maximum number of follow-up emails</div>
-            </div>
-          </div>
-        </div>
-
-        <div className="form-section">
-          <h3 className="section-title">
-            <i className="fas fa-clock"></i>
-            Schedule Settings
-          </h3>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label className="form-label" htmlFor="start_date">Start Date</label>
-              <input
-                type="date"
-                id="start_date"
-                name="start_date"
-                className="form-input"
-                value={formData.start_date}
-                onChange={handleChange}
-              />
-              <div className="form-hint">When to start sending emails</div>
-            </div>
-
-            <div className="form-group">
-              <label className="form-label" htmlFor="daily_limit">Daily Email Limit</label>
-              <input
-                type="number"
-                id="daily_limit"
-                name="daily_limit"
-                className="form-input"
-                min="1"
-                max="200"
-                value={formData.daily_limit}
-                onChange={handleChange}
-              />
-              <div className="form-hint">Maximum emails to send per day</div>
-            </div>
-          </div>
-
-          <div className="form-row full">
-            <div className="form-group">
-              <label className="form-label">Sending Hours</label>
-              <div className="checkbox-group">
-                <div className="checkbox-item">
-                  <input
-                    type="checkbox"
-                    id="send_weekdays"
-                    name="send_weekdays"
-                    checked={formData.send_weekdays}
-                    onChange={handleChange}
-                  />
-                  <label htmlFor="send_weekdays">Weekdays only (Mon-Fri)</label>
-                </div>
-                <div className="checkbox-item">
-                  <input
-                    type="checkbox"
-                    id="send_business_hours"
-                    name="send_business_hours"
-                    checked={formData.send_business_hours}
-                    onChange={handleChange}
-                  />
-                  <label htmlFor="send_business_hours">Business hours only (9 AM - 5 PM)</label>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="form-section">
-          <h3 className="section-title">
-            <i className="fas fa-sliders-h"></i>
-            Advanced Rules
-          </h3>
-
-          <div className="form-row full">
-            <div className="form-group">
-              <label className="form-label">Stop Campaign If</label>
-              <div className="checkbox-group">
-                <div className="checkbox-item">
-                  <input
-                    type="checkbox"
-                    id="stop_on_reply"
-                    name="stop_on_reply"
-                    checked={formData.stop_on_reply}
-                    onChange={handleChange}
-                  />
-                  <label htmlFor="stop_on_reply">Lead replies to email</label>
-                </div>
-                <div className="checkbox-item">
-                  <input
-                    type="checkbox"
-                    id="stop_on_unsubscribe"
-                    name="stop_on_unsubscribe"
-                    checked={formData.stop_on_unsubscribe}
-                    onChange={handleChange}
-                  />
-                  <label htmlFor="stop_on_unsubscribe">Lead unsubscribes</label>
-                </div>
-                <div className="checkbox-item">
-                  <input
-                    type="checkbox"
-                    id="stop_on_bounce"
-                    name="stop_on_bounce"
-                    checked={formData.stop_on_bounce}
-                    onChange={handleChange}
-                  />
-                  <label htmlFor="stop_on_bounce">Email bounces</label>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label className="form-label" htmlFor="priority">Campaign Priority</label>
-              <select
-                id="priority"
-                name="priority"
-                className="form-select"
-                value={formData.priority}
-                onChange={handleChange}
-              >
-                <option value="low">Low</option>
-                <option value="normal">Normal</option>
-                <option value="high">High</option>
-              </select>
-            </div>
-
-            <div className="form-group">
-              <label className="form-label" htmlFor="status">Initial Status</label>
-              <select
-                id="status"
-                name="status"
-                className="form-select"
-                value={formData.status}
-                onChange={handleChange}
-              >
-                <option value="draft">Draft</option>
-                <option value="active">Active</option>
-                <option value="paused">Paused</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        <div className="action-buttons">
-          <a href="/campaign-manager" className="btn btn-secondary">
-            <i className="fas fa-times"></i>
-            Cancel
-          </a>
-          <button type="button" className="btn btn-outline" onClick={(e) => handleSubmit(e, true)}>
-            <i className="fas fa-save"></i>
-            Save as Draft
-          </button>
-          <button type="submit" className="btn btn-primary">
-            <i className="fas fa-rocket"></i>
-            Launch Campaign
-          </button>
-        </div>
-      </form>
     </MainLayout>
   )
 }

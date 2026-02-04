@@ -1,13 +1,18 @@
+'use client'
+
 import TopNav from './TopNav'
 import Sidebar from './Sidebar'
+import { useState } from 'react'
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+
   return (
     <>
-      <TopNav />
+      <TopNav onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)} />
       <div className="main-wrapper">
-        <Sidebar />
-        <div className="content-wrapper">
+        <Sidebar collapsed={sidebarCollapsed} />
+        <div className={`content-wrapper ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
           <main className="container">{children}</main>
         </div>
       </div>

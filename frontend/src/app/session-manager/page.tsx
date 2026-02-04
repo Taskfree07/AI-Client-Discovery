@@ -17,6 +17,7 @@ export default function SessionManagerPage() {
   const [sessions, setSessions] = useState<Session[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
+  const [activeFilter, setActiveFilter] = useState('today')
 
   useEffect(() => {
     loadSessions()
@@ -27,40 +28,77 @@ export default function SessionManagerPage() {
       const response = await fetch('/api/sessions')
       if (response.ok) {
         const data = await response.json()
-        setSessions(data)
+        // Ensure data is an array
+        if (Array.isArray(data)) {
+          setSessions(data)
+        } else if (data && Array.isArray(data.sessions)) {
+          setSessions(data.sessions)
+        } else {
+          console.warn('API returned non-array data:', data)
+          setSessions([])
+        }
+      } else {
+        console.error('Failed to load sessions:', response.status)
+        setSessions([])
       }
     } catch (error) {
       console.error('Error loading sessions:', error)
+      setSessions([])
     } finally {
       setLoading(false)
     }
   }
 
-  const filteredSessions = sessions.filter(session =>
-    session.title.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const filteredSessions = Array.isArray(sessions)
+    ? sessions.filter(session =>
+        session.title?.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    : []
+
+  const filterOptions = [
+    { id: 'today', label: 'Today' },
+    { id: 'week', label: 'This Week' },
+    { id: 'month', label: 'This Month' },
+    { id: 'scheduled', label: 'Scheduled' },
+    { id: 'all', label: 'All' }
+  ]
 
   return (
     <MainLayout>
-      <div className="page-header">
-        <h1 className="page-title">Session Manager</h1>
-        <p className="page-subtitle">View and manage your lead generation sessions</p>
-      </div>
-
-      <div className="session-manager-controls">
-        <div className="search-bar">
-          <input
-            type="text"
-            className="search-input"
-            placeholder="Search sessions..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+      <div className="page-header-row">
+        <div className="page-header">
+          <h1 className="page-title">Session Manager</h1>
+          <p className="page-subtitle">Manage automated lead generation sessions</p>
         </div>
         <Link href="/lead-engine" className="btn-primary">
           <i className="fas fa-plus"></i>
           New Session
         </Link>
+      </div>
+
+      {/* Search Bar */}
+      <div className="search-container">
+        <i className="fas fa-search search-icon"></i>
+        <input
+          type="text"
+          className="search-input"
+          placeholder="Search sessions by name, status, or region..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+      </div>
+
+      {/* Filter Tabs */}
+      <div className="filter-tabs">
+        {filterOptions.map(filter => (
+          <button
+            key={filter.id}
+            className={`filter-tab ${activeFilter === filter.id ? 'active' : ''}`}
+            onClick={() => setActiveFilter(filter.id)}
+          >
+            {filter.label}
+          </button>
+        ))}
       </div>
 
       {loading ? (
@@ -102,18 +140,20 @@ export default function SessionManagerPage() {
       ) : (
         <div className="empty-state-card">
           <div className="empty-state-icon">
-            <i className="fas fa-folder-open"></i>
+            <i className="fas fa-search"></i>
           </div>
-          <h3 className="empty-state-title">No Sessions Found</h3>
+          <h3 className="empty-state-title">No sessions found</h3>
           <p className="empty-state-description">
-            {searchTerm
-              ? 'No sessions match your search criteria.'
-              : 'Start generating leads to create your first session.'}
+            No sessions found for this period
           </p>
-          <Link href="/lead-engine" className="btn-primary">
-            <i className="fas fa-plus"></i>
-            Create New Session
-          </Link>
+          <div className="empty-state-actions">
+            <button className="btn-secondary" onClick={() => setActiveFilter('week')}>
+              Switch Timeline
+            </button>
+            <button className="btn-primary" onClick={() => setActiveFilter('all')}>
+              View All
+            </button>
+          </div>
         </div>
       )}
     </MainLayout>

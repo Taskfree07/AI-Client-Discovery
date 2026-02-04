@@ -219,12 +219,12 @@ export default function LeadEnginePage() {
 
   return (
     <MainLayout>
-      <div className="session-header">
+      <div className="lead-search-header">
         <label className="session-title-label">Session Title :</label>
         <input
           type="text"
           className="session-title-input"
-          placeholder="Enter session name..."
+          placeholder={`Lead Search - ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`}
           value={formData.sessionTitle}
           onChange={(e) => setFormData(prev => ({ ...prev, sessionTitle: e.target.value }))}
         />
@@ -232,15 +232,10 @@ export default function LeadEnginePage() {
 
       <div className="search-panel">
         <div className="search-row">
-          <div className="search-group">
+          <div className="search-group flex-grow">
             <label className="search-label">Job Titles</label>
             <div className="search-input-wrapper">
-              <span className="search-icon">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="11" cy="11" r="8"/>
-                  <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                </svg>
-              </span>
+              <i className="fas fa-search search-icon-inner"></i>
               <input
                 type="text"
                 className="search-input"
@@ -254,13 +249,13 @@ export default function LeadEnginePage() {
               {formData.jobTitles.map((tag, index) => (
                 <span key={index} className="tag">
                   {tag}
-                  <span className="tag-remove" onClick={() => removeTag('jobTitles', index)}>x</span>
+                  <span className="tag-remove" onClick={() => removeTag('jobTitles', index)}>×</span>
                 </span>
               ))}
             </div>
           </div>
 
-          <div className="search-group">
+          <div className="search-group number-group">
             <label className="search-label">Number of Jobs</label>
             <input
               type="number"
@@ -273,14 +268,27 @@ export default function LeadEnginePage() {
           </div>
         </div>
 
-        <button className="advanced-toggle" onClick={() => setShowAdvanced(!showAdvanced)}>
-          Advanced Options
-          <span className="arrow">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="6 9 12 15 18 9"/>
-            </svg>
-          </span>
-        </button>
+        <div className="search-actions">
+          <button className="btn-secondary advanced-toggle" onClick={() => setShowAdvanced(!showAdvanced)}>
+            Advanced Options
+            <i className={`fas fa-chevron-${showAdvanced ? 'up' : 'down'} ml-2`}></i>
+          </button>
+
+          <button 
+            className="btn-primary btn-green" 
+            onClick={generateLeads}
+            disabled={isGenerating}
+          >
+            {isGenerating ? (
+              <>
+                <span className="spinner-sm"></span>
+                Generating...
+              </>
+            ) : (
+              'Generate Leads'
+            )}
+          </button>
+        </div>
 
         {showAdvanced && (
           <div className="advanced-options show">
@@ -289,12 +297,7 @@ export default function LeadEnginePage() {
                 <div className="search-group" style={{ marginBottom: '20px' }}>
                   <label className="search-label">Locations</label>
                   <div className="search-input-wrapper">
-                    <span className="search-icon">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <circle cx="11" cy="11" r="8"/>
-                        <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                      </svg>
-                    </span>
+                    <i className="fas fa-search search-icon-inner"></i>
                     <input
                       type="text"
                       className="search-input"

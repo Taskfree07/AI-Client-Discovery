@@ -69,6 +69,7 @@ body {
 
 .nav-menu {
     list-style: none;
+    padding: 1rem 0;
 }
 
 .nav-item {
@@ -84,6 +85,8 @@ body {
     text-decoration: none;
     transition: all 0.2s;
     font-weight: 500;
+    cursor: pointer;
+    width: 100%;
 }
 
 .nav-link:hover,
@@ -96,6 +99,50 @@ body {
 .nav-icon {
     width: 20px;
     height: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Nav Group Styles */
+.nav-group {
+    margin: 0.25rem 0;
+}
+
+.nav-group-header {
+    position: relative;
+    cursor: pointer;
+    user-select: none;
+}
+
+.nav-arrow {
+    margin-left: auto;
+    transition: transform 0.3s ease;
+    display: inline-flex;
+}
+
+.nav-group.expanded .nav-arrow {
+    transform: rotate(180deg);
+}
+
+.nav-submenu {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+    padding-left: 1rem;
+}
+
+.nav-submenu.show {
+    max-height: 300px;
+}
+
+.nav-submenu .nav-item {
+    margin: 0;
+}
+
+.nav-submenu .nav-link {
+    padding: 0.625rem 1.5rem 0.625rem 2.5rem;
+    font-size: 0.9rem;
 }
 
 /* Main Content */
