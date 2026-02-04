@@ -57,38 +57,12 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
           </Link>
         </div>
 
-        {/* Lead Engine Group */}
-        <div className={`nav-group ${expandedGroups.has('lead-engine') ? 'expanded' : ''}`}>
-          <div className="nav-item">
-            <div 
-              className={`nav-link nav-group-header ${isGroupActive(['/lead-engine', '/session-manager']) ? 'group-active' : ''}`} 
-              onClick={() => toggleGroup('lead-engine')}
-            >
-              <i className="fas fa-crosshairs nav-icon"></i>
-              {!collapsed && (
-                <>
-                  <span>Lead Engine</span>
-                  <span className="nav-arrow">
-                    <i className="fas fa-chevron-down"></i>
-                  </span>
-                </>
-              )}
-            </div>
-          </div>
-          {!collapsed && (
-            <div className={`nav-submenu ${expandedGroups.has('lead-engine') ? 'show' : ''}`}>
-              <div className="nav-item">
-                <Link href="/lead-engine" className={`nav-link ${isActive('/lead-engine') ? 'active' : ''}`}>
-                  <span>Lead Search</span>
-                </Link>
-              </div>
-              <div className="nav-item">
-                <Link href="/session-manager" className={`nav-link ${isActive('/session-manager') ? 'active' : ''}`}>
-                  <span>Session Manager</span>
-                </Link>
-              </div>
-            </div>
-          )}
+        {/* Session Manager */}
+        <div className="nav-item">
+          <Link href="/session-manager" className={`nav-link ${isActive('/session-manager') ? 'active' : ''}`}>
+            <i className="fas fa-crosshairs nav-icon"></i>
+            {!collapsed && <span>Session Manager</span>}
+          </Link>
         </div>
 
         {/* Campaign Manager Group */}
