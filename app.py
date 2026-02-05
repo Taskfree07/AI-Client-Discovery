@@ -323,7 +323,8 @@ def get_campaigns():
         'status': c.status,
         'schedule_enabled': c.schedule_enabled,
         'schedule_frequency': c.schedule_frequency,
-        'created_at': c.created_at.isoformat()
+        'created_at': c.created_at.isoformat(),
+        'leads': JobLead.query.filter_by(campaign_id=c.id).count()
     } for c in campaigns])
 
 @app.route('/api/campaigns', methods=['POST'])

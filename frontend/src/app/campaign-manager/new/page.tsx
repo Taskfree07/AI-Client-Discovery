@@ -6,18 +6,28 @@ import { useRouter } from 'next/navigation'
 
 interface Session {
   id: number
-  title: string
+  name: string
   created_at: string
-  lead_count: number
+  total_leads: number
   job_titles: string[]
 }
 
 interface Template {
   id: number
   name: string
-  subject: string
-  body: string
-  category: string
+  subject_template: string
+  body_template: string
+  is_default: boolean
+}
+
+interface AddedLead {
+  id: string
+  company: string
+  jobTitle: string
+  name: string
+  title: string
+  email: string
+  source: 'csv' | 'lead-engine' | 'manual'
 }
 
 interface CampaignFormData {
@@ -52,6 +62,10 @@ export default function CampaignBuilderPage() {
   const [templates, setTemplates] = useState<Template[]>([])
   const [loadingSessions, setLoadingSessions] = useState(true)
   const [loadingTemplates, setLoadingTemplates] = useState(true)
+  const [addedLeads, setAddedLeads] = useState<AddedLead[]>([])
+  const [showManualForm, setShowManualForm] = useState(false)
+  const [manualLead, setManualLead] = useState({ name: '', email: '', company: '', title: '' })
+  const [importingSession, setImportingSession] = useState(false)
 
   const [formData, setFormData] = useState<CampaignFormData>({
     campaign_name: '',
@@ -160,6 +174,128 @@ export default function CampaignBuilderPage() {
     }))
   }
 
+  const parseCSVLine = (line: string): string[] => {
+    const result: string[] = []
+    let current = ''
+    let inQuotes = false
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i]
+      if (ch === '"') {
+        inQuotes = !inQuotes
+      } else if (ch === ',' && !inQuotes) {
+        result.push(current.trim())
+        current = ''
+      } else {
+        current += ch
+      }
+    }
+    result.push(current.trim())
+    return result
+  }
+
+  const handleCSVUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      const text = event.target?.result as string
+      const lines = text.split(/\r?\n/).filter(l => l.trim())
+      if (lines.length < 2) return
+      const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase())
+      const colMap = {
+        name: headers.findIndex(h => h.includes('name') && !h.includes('company')),
+        email: headers.findIndex(h => h.includes('email')),
+        company: headers.findIndex(h => h.includes('company')),
+        title: headers.findIndex(h => h.includes('title')),
+        jobOpening: headers.findIndex(h => h.includes('job'))
+      }
+      const newLeads: AddedLead[] = []
+      for (let i = 1; i < lines.length; i++) {
+        const cols = parseCSVLine(lines[i])
+        const email = colMap.email >= 0 ? cols[colMap.email] : ''
+        if (!email) continue
+        newLeads.push({
+          id: `csv-${Date.now()}-${i}`,
+          name: colMap.name >= 0 ? cols[colMap.name] : '',
+          email,
+          company: colMap.company >= 0 ? cols[colMap.company] : '',
+          title: colMap.title >= 0 ? cols[colMap.title] : '',
+          jobTitle: colMap.jobOpening >= 0 ? cols[colMap.jobOpening] : '',
+          source: 'csv'
+        })
+      }
+      setAddedLeads(prev => {
+        const existingEmails = new Set(prev.map(l => l.email.toLowerCase()))
+        const deduped = newLeads.filter(l => !existingEmails.has(l.email.toLowerCase()))
+        return [...prev, ...deduped]
+      })
+    }
+    reader.readAsText(file)
+    e.target.value = ''
+  }
+
+  const handleImportSession = async () => {
+    if (!formData.selected_session_id) return
+    setImportingSession(true)
+    try {
+      const response = await fetch(`/api/sessions/${formData.selected_session_id}`)
+      if (response.ok) {
+        const data = await response.json()
+        const leads = data.leads || []
+        const newLeads: AddedLead[] = []
+        leads.forEach((lead: any) => {
+          const company = lead.company?.name || ''
+          const jobOpening = lead.job_opening || ''
+          const pocs = lead.pocs || []
+          pocs.forEach((poc: any, idx: number) => {
+            if (poc.email) {
+              newLeads.push({
+                id: `le-${lead.id || Date.now()}-${idx}`,
+                name: poc.name || '',
+                email: poc.email,
+                company,
+                title: poc.title || '',
+                jobTitle: jobOpening,
+                source: 'lead-engine'
+              })
+            }
+          })
+        })
+        setAddedLeads(prev => {
+          const existingEmails = new Set(prev.map(l => l.email.toLowerCase()))
+          const deduped = newLeads.filter(l => !existingEmails.has(l.email.toLowerCase()))
+          return [...prev, ...deduped]
+        })
+      }
+    } catch (error) {
+      console.error('Error importing session leads:', error)
+    } finally {
+      setImportingSession(false)
+    }
+  }
+
+  const handleAddManual = () => {
+    if (!manualLead.email) return
+    setAddedLeads(prev => {
+      const exists = prev.some(l => l.email.toLowerCase() === manualLead.email.toLowerCase())
+      if (exists) return prev
+      return [...prev, {
+        id: `manual-${Date.now()}`,
+        name: manualLead.name,
+        email: manualLead.email,
+        company: manualLead.company,
+        title: manualLead.title,
+        jobTitle: '',
+        source: 'manual'
+      }]
+    })
+    setManualLead({ name: '', email: '', company: '', title: '' })
+  }
+
+  const removeLead = (id: string) => {
+    setAddedLeads(prev => prev.filter(l => l.id !== id))
+  }
+
   const selectedSession = sessions.find(s => s.id === formData.selected_session_id)
   const selectedTemplate = templates.find(t => t.id === formData.selected_template_id)
 
@@ -227,10 +363,8 @@ export default function CampaignBuilderPage() {
             <div className="step-panel">
               <h2 className="step-title">Add Leads</h2>
               <div className="leads-options">
-                <div 
-                  className="lead-option-card"
-                  onClick={() => document.getElementById('csv-upload')?.click()}
-                >
+                {/* CSV Upload Card */}
+                <div className="lead-option-card">
                   <div className="lead-option-icon blue">
                     <i className="fas fa-upload"></i>
                   </div>
@@ -238,12 +372,15 @@ export default function CampaignBuilderPage() {
                   <p className="lead-option-desc">
                     Upload a CSV file containing your leads. Make sure it includes email, name, and company details.
                   </p>
-                  <input type="file" id="csv-upload" accept=".csv" hidden />
+                  <label className="lead-option-import-btn">
+                    <i className="fas fa-folder-open"></i>
+                    Choose File
+                    <input type="file" accept=".csv" hidden onChange={handleCSVUpload} />
+                  </label>
                 </div>
 
-                <div 
-                  className={`lead-option-card ${formData.selected_session_id ? 'selected' : ''}`}
-                >
+                {/* Lead Engine Import Card */}
+                <div className="lead-option-card">
                   <div className="lead-option-icon purple">
                     <i className="fas fa-cog"></i>
                   </div>
@@ -254,27 +391,40 @@ export default function CampaignBuilderPage() {
                   {loadingSessions ? (
                     <div className="loading-text">Loading sessions...</div>
                   ) : sessions.length > 0 ? (
-                    <select
-                      className="session-select"
-                      value={formData.selected_session_id || ''}
-                      onChange={(e) => setFormData(prev => ({ 
-                        ...prev, 
-                        selected_session_id: e.target.value ? parseInt(e.target.value) : null 
-                      }))}
-                    >
-                      <option value="">Select a session...</option>
-                      {sessions.map(session => (
-                        <option key={session.id} value={session.id}>
-                          {session.title} ({session.lead_count} leads)
-                        </option>
-                      ))}
-                    </select>
+                    <>
+                      <select
+                        className="session-select"
+                        value={formData.selected_session_id || ''}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          selected_session_id: e.target.value ? parseInt(e.target.value) : null
+                        }))}
+                      >
+                        <option value="">Select a session...</option>
+                        {sessions.map(session => (
+                          <option key={session.id} value={session.id}>
+                            {session.name} ({session.total_leads} leads)
+                          </option>
+                        ))}
+                      </select>
+                      {formData.selected_session_id && (
+                        <button
+                          className="lead-option-import-btn"
+                          onClick={handleImportSession}
+                          disabled={importingSession}
+                        >
+                          <i className={importingSession ? 'fas fa-spinner fa-spin' : 'fas fa-download'}></i>
+                          {importingSession ? 'Importing...' : 'Import Leads'}
+                        </button>
+                      )}
+                    </>
                   ) : (
                     <p className="no-data-text">No sessions available. Generate leads first.</p>
                   )}
                 </div>
 
-                <div className="lead-option-card">
+                {/* Manual Entry Card */}
+                <div className={`lead-option-card ${showManualForm ? 'selected' : ''}`}>
                   <div className="lead-option-icon gray">
                     <i className="fas fa-plus"></i>
                   </div>
@@ -282,13 +432,100 @@ export default function CampaignBuilderPage() {
                   <p className="lead-option-desc">
                     Manually add leads one by one with email, name, and company details.
                   </p>
+                  <button
+                    className="lead-option-import-btn"
+                    onClick={() => setShowManualForm(!showManualForm)}
+                  >
+                    <i className={showManualForm ? 'fas fa-minus' : 'fas fa-plus'}></i>
+                    {showManualForm ? 'Hide Form' : 'Add Lead'}
+                  </button>
                 </div>
               </div>
 
-              {selectedSession && (
-                <div className="selected-info-box">
-                  <i className="fas fa-check-circle"></i>
-                  <span>Selected: <strong>{selectedSession.title}</strong> with {selectedSession.lead_count} leads</span>
+              {/* Manual Entry Form */}
+              {showManualForm && (
+                <div className="manual-form-section">
+                  <h4 className="manual-form-title">Add Lead Details</h4>
+                  <div className="manual-form-row">
+                    <input
+                      type="text"
+                      className="manual-form-input"
+                      placeholder="Name"
+                      value={manualLead.name}
+                      onChange={(e) => setManualLead(prev => ({ ...prev, name: e.target.value }))}
+                    />
+                    <input
+                      type="email"
+                      className="manual-form-input"
+                      placeholder="Email *"
+                      value={manualLead.email}
+                      onChange={(e) => setManualLead(prev => ({ ...prev, email: e.target.value }))}
+                    />
+                    <input
+                      type="text"
+                      className="manual-form-input"
+                      placeholder="Company"
+                      value={manualLead.company}
+                      onChange={(e) => setManualLead(prev => ({ ...prev, company: e.target.value }))}
+                    />
+                    <input
+                      type="text"
+                      className="manual-form-input"
+                      placeholder="Title"
+                      value={manualLead.title}
+                      onChange={(e) => setManualLead(prev => ({ ...prev, title: e.target.value }))}
+                    />
+                    <button
+                      className="lead-option-import-btn add-btn"
+                      onClick={handleAddManual}
+                      disabled={!manualLead.email}
+                    >
+                      <i className="fas fa-plus"></i>
+                      Add
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Added Leads Table */}
+              {addedLeads.length > 0 && (
+                <div className="added-leads-section">
+                  <div className="added-leads-header">
+                    <h4 className="added-leads-title">
+                      Added Leads <span className="added-leads-count">{addedLeads.length}</span>
+                    </h4>
+                    <button className="added-leads-clear" onClick={() => setAddedLeads([])}>
+                      <i className="fas fa-trash"></i> Clear all
+                    </button>
+                  </div>
+                  <table className="results-table">
+                    <thead>
+                      <tr>
+                        <th>Company</th>
+                        <th>Name</th>
+                        <th>Title</th>
+                        <th>Email</th>
+                        <th>Source</th>
+                        <th style={{ width: '40px' }}></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {addedLeads.map(lead => (
+                        <tr key={lead.id}>
+                          <td>{lead.company || '—'}</td>
+                          <td>{lead.name || '—'}</td>
+                          <td>{lead.title || lead.jobTitle || '—'}</td>
+                          <td>{lead.email}</td>
+                          <td><span className={`source-badge ${lead.source}`}>{lead.source === 'lead-engine' ? 'Lead Engine' : lead.source === 'csv' ? 'CSV' : 'Manual'}</span></td>
+                          <td>
+                            <button className="lead-row-remove" onClick={() => removeLead(lead.id)} title="Remove">
+                              <i className="fas fa-times"></i>
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </div>
@@ -320,12 +557,11 @@ export default function CampaignBuilderPage() {
                         )}
                       </div>
                       <div className="template-select-subject">
-                        <strong>Subject:</strong> {template.subject}
+                        <strong>Subject:</strong> {template.subject_template}
                       </div>
                       <div className="template-select-preview">
-                        {template.body ? template.body.substring(0, 100) : 'No preview available'}...
+                        {template.body_template ? template.body_template.substring(0, 100) : 'No preview available'}...
                       </div>
-                      <span className="template-category-badge">{template.category}</span>
                     </div>
                   ))}
                 </div>
@@ -497,11 +733,27 @@ export default function CampaignBuilderPage() {
                     Leads
                   </h3>
                   <div className="review-item">
-                    <span className="review-label">Source:</span>
-                    <span className="review-value">
-                      {selectedSession ? `${selectedSession.title} (${selectedSession.lead_count} leads)` : 'Not selected'}
-                    </span>
+                    <span className="review-label">Total Leads:</span>
+                    <span className="review-value">{addedLeads.length}</span>
                   </div>
+                  {addedLeads.filter(l => l.source === 'csv').length > 0 && (
+                    <div className="review-item">
+                      <span className="review-label">From CSV:</span>
+                      <span className="review-value"><span className="source-badge csv">CSV</span> {addedLeads.filter(l => l.source === 'csv').length}</span>
+                    </div>
+                  )}
+                  {addedLeads.filter(l => l.source === 'lead-engine').length > 0 && (
+                    <div className="review-item">
+                      <span className="review-label">From Lead Engine:</span>
+                      <span className="review-value"><span className="source-badge lead-engine">Lead Engine</span> {addedLeads.filter(l => l.source === 'lead-engine').length}</span>
+                    </div>
+                  )}
+                  {addedLeads.filter(l => l.source === 'manual').length > 0 && (
+                    <div className="review-item">
+                      <span className="review-label">Manual:</span>
+                      <span className="review-value"><span className="source-badge manual">Manual</span> {addedLeads.filter(l => l.source === 'manual').length}</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="review-card">
@@ -516,7 +768,7 @@ export default function CampaignBuilderPage() {
                   {selectedTemplate && (
                     <div className="review-item">
                       <span className="review-label">Subject:</span>
-                      <span className="review-value">{selectedTemplate.subject}</span>
+                      <span className="review-value">{selectedTemplate.subject_template}</span>
                     </div>
                   )}
                 </div>
@@ -569,7 +821,12 @@ export default function CampaignBuilderPage() {
           )}
           <div className="footer-right">
             {currentStep < 4 ? (
-              <button className="btn-primary" onClick={handleNext}>
+              <button
+                className="btn-primary"
+                onClick={handleNext}
+                disabled={currentStep === 1 && addedLeads.length === 0}
+                style={currentStep === 1 && addedLeads.length === 0 ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+              >
                 Save and Next
               </button>
             ) : (

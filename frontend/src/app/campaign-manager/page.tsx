@@ -1,102 +1,101 @@
 'use client'
 
 import MainLayout from '@/components/MainLayout'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
 interface Campaign {
   id: number
   name: string
-  description: string
-  status: 'active' | 'paused' | 'draft' | 'completed'
+  search_keywords: string
+  status: string
   leads: number
-  lastUpdated: string
-  progress: number
-  openRate: number
-  clickRate: number
+  created_at: string
 }
 
 export default function CampaignManagerPage() {
+  const router = useRouter()
+  const [campaigns, setCampaigns] = useState<Campaign[]>([])
+  const [loading, setLoading] = useState(true)
   const [typeFilter, setTypeFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [dateFilter, setDateFilter] = useState('')
+  const [panelOpen, setPanelOpen] = useState(false)
+  const [campaignName, setCampaignName] = useState('')
 
-  // Sample campaigns data
-  const campaigns: Campaign[] = [
-    {
-      id: 1,
-      name: 'Campaign no.1 Ai developer leads',
-      description: 'Email campaign targeting companies in the US',
-      status: 'active',
-      leads: 150,
-      lastUpdated: 'Update Jan 8',
-      progress: 80,
-      openRate: 30,
-      clickRate: 40
-    },
-    {
-      id: 2,
-      name: 'Campaign no.2 java leads',
-      description: 'Email campaign targeting companies in the US',
-      status: 'active',
-      leads: 150,
-      lastUpdated: 'Update Jan 8',
-      progress: 80,
-      openRate: 30,
-      clickRate: 40
-    },
-    {
-      id: 3,
-      name: 'Campaign no.3 Python leads',
-      description: 'Email campaign targeting companies in the US',
-      status: 'active',
-      leads: 150,
-      lastUpdated: 'Update Jan 8',
-      progress: 80,
-      openRate: 30,
-      clickRate: 40
-    }
-  ]
+  useEffect(() => {
+    loadCampaigns()
+  }, [])
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active': return '#22C55E'
-      case 'paused': return '#F59E0B'
-      case 'draft': return '#6B7280'
-      case 'completed': return '#3B82F6'
-      default: return '#6B7280'
+  const loadCampaigns = async () => {
+    try {
+      const response = await fetch('/api/campaigns')
+      if (response.ok) {
+        const data = await response.json()
+        setCampaigns(Array.isArray(data) ? data : [])
+      }
+    } catch (error) {
+      console.error('Error loading campaigns:', error)
+    } finally {
+      setLoading(false)
     }
   }
 
+  const filteredCampaigns = campaigns.filter(c => {
+    if (statusFilter && c.status !== statusFilter) return false
+    if (dateFilter) {
+      const created = new Date(c.created_at)
+      const now = new Date()
+      const diff = (now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24)
+      if (dateFilter === '7days' && diff > 7) return false
+      if (dateFilter === '30days' && diff > 30) return false
+      if (dateFilter === '3months' && diff > 90) return false
+      if (dateFilter === '6months' && diff > 180) return false
+    }
+    return true
+  })
+
+  const totalCampaigns = campaigns.length
+  const activeCampaigns = campaigns.filter(c => c.status === 'active').length
+  const pausedCampaigns = campaigns.filter(c => c.status === 'paused').length
+  const draftCampaigns = campaigns.filter(c => c.status === 'draft').length
+
   return (
     <MainLayout>
-      <div className="page-header">
-        <h1 className="page-title">Campaign Manager</h1>
-        <p className="page-subtitle">Create and manage multi-channel outreach campaigns</p>
+      <div className="page-header-row">
+        <div className="page-header">
+          <h1 className="page-title">Campaign Manager</h1>
+          <p className="page-subtitle">Create and manage multi-channel outreach campaigns</p>
+        </div>
+        <button className="btn-primary" onClick={() => { setCampaignName(''); setPanelOpen(true) }}>
+          <i className="fas fa-plus"></i>
+          New Campaign
+        </button>
       </div>
 
       <div className="stats-grid-4">
         <div className="stat-card-new">
           <div className="stat-card-label blue">Total Campaigns</div>
-          <div className="stat-card-value blue">5</div>
+          <div className="stat-card-value blue">{totalCampaigns}</div>
           <div className="stat-card-desc">Across all channels</div>
         </div>
 
         <div className="stat-card-new">
           <div className="stat-card-label green">Active</div>
-          <div className="stat-card-value green">2</div>
+          <div className="stat-card-value green">{activeCampaigns}</div>
           <div className="stat-card-desc">Across all channels</div>
         </div>
 
         <div className="stat-card-new">
           <div className="stat-card-label yellow">Paused</div>
-          <div className="stat-card-value yellow">1</div>
+          <div className="stat-card-value yellow">{pausedCampaigns}</div>
           <div className="stat-card-desc">Across all channels</div>
         </div>
 
         <div className="stat-card-new">
           <div className="stat-card-label orange">Drafts</div>
-          <div className="stat-card-value orange">6</div>
+          <div className="stat-card-value orange">{draftCampaigns}</div>
           <div className="stat-card-desc">Across all channels</div>
         </div>
       </div>
@@ -147,48 +146,101 @@ export default function CampaignManagerPage() {
         </div>
       </div>
 
-      <div className="campaigns-list">
-        {campaigns.map(campaign => (
-          <div key={campaign.id} className="campaign-card">
-            <div className="campaign-card-main">
-              <div className="campaign-info">
-                <h3 className="campaign-title">{campaign.name}</h3>
-                <p className="campaign-description">{campaign.description}</p>
-                <div className="campaign-meta">
-                  <span className={`campaign-status ${campaign.status}`}>
-                    {campaign.status.charAt(0).toUpperCase() + campaign.status.slice(1)}
-                  </span>
-                  <span className="campaign-leads">
-                    <i className="fas fa-users"></i> {campaign.leads} leads
-                  </span>
-                  <span className="campaign-date">
-                    <i className="far fa-clock"></i> {campaign.lastUpdated}
-                  </span>
+      {loading ? (
+        <div className="loading-container">
+          <div className="loading-spinner"></div>
+          <p>Loading campaigns...</p>
+        </div>
+      ) : filteredCampaigns.length > 0 ? (
+        <div className="campaigns-list">
+          {filteredCampaigns.map(campaign => (
+            <div key={campaign.id} className="campaign-card">
+              <div className="campaign-card-main">
+                <div className="campaign-info">
+                  <h3 className="campaign-title">{campaign.name}</h3>
+                  <p className="campaign-description">{campaign.search_keywords}</p>
+                  <div className="campaign-meta">
+                    <span className={`campaign-status ${campaign.status}`}>
+                      {campaign.status.charAt(0).toUpperCase() + campaign.status.slice(1)}
+                    </span>
+                    <span className="campaign-leads">
+                      <i className="fas fa-users"></i> {campaign.leads} leads
+                    </span>
+                    <span className="campaign-date">
+                      <i className="far fa-clock"></i> {new Date(campaign.created_at).toLocaleDateString()}
+                    </span>
+                  </div>
+                </div>
+                <div className="campaign-actions">
+                  <button className="icon-btn" title="Edit">
+                    <i className="far fa-edit"></i>
+                  </button>
+                  <button className="icon-btn" title="Settings">
+                    <i className="fas fa-cog"></i>
+                  </button>
+                  <button className="icon-btn" title="Export">
+                    <i className="fas fa-share-alt"></i>
+                  </button>
                 </div>
               </div>
-              <div className="campaign-actions">
-                <button className="icon-btn" title="Edit">
-                  <i className="far fa-edit"></i>
-                </button>
-                <button className="icon-btn" title="Settings">
-                  <i className="fas fa-cog"></i>
-                </button>
-                <button className="icon-btn" title="Export">
-                  <i className="fas fa-share-alt"></i>
-                </button>
-              </div>
             </div>
-            <div className="campaign-progress-section">
-              <div className="progress-bar-container">
-                <div className="progress-bar" style={{ width: `${campaign.progress}%` }}></div>
-              </div>
-              <div className="campaign-stats-row">
-                <span className="progress-text">{campaign.progress}% complete</span>
-                <span className="campaign-rates">{campaign.openRate}% open rate • {campaign.clickRate}% click rate</span>
-              </div>
-            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="empty-state-card">
+          <div className="empty-state-icon">
+            <i className="fas fa-bullhorn"></i>
           </div>
-        ))}
+          <h3 className="empty-state-title">No campaigns yet</h3>
+          <p className="empty-state-description">
+            Create your first campaign to start reaching out to leads.
+          </p>
+          <button className="btn-primary" onClick={() => { setCampaignName(''); setPanelOpen(true) }}>
+            <i className="fas fa-plus"></i>
+            New Campaign
+          </button>
+        </div>
+      )}
+      {/* Slide-out overlay */}
+      <div
+        className={`slideout-overlay ${panelOpen ? 'open' : ''}`}
+        onClick={() => setPanelOpen(false)}
+      />
+
+      {/* Slide-out Panel - New Campaign */}
+      <div className={`slideout-panel ${panelOpen ? 'open' : ''}`}>
+        <div className="slideout-panel-header">
+          <h2 className="slideout-panel-title">New Campaign</h2>
+          <button className="panel-close-text" onClick={() => setPanelOpen(false)}>
+            <i className="fas fa-times"></i>
+            <span>close</span>
+          </button>
+        </div>
+
+        <div className="slideout-panel-body">
+          <div className="panel-field">
+            <label className="panel-label">Campaign Name</label>
+            <input
+              type="text"
+              className="panel-input"
+              placeholder="Enter campaign name"
+              value={campaignName}
+              onChange={(e) => setCampaignName(e.target.value)}
+            />
+          </div>
+
+          <div className="panel-footer">
+            <button
+              className="panel-generate-btn"
+              onClick={() => {
+                setPanelOpen(false)
+                router.push('/campaign-manager/new')
+              }}
+            >
+              Start Campaign
+            </button>
+          </div>
+        </div>
       </div>
     </MainLayout>
   )

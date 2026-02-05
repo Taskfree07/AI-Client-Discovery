@@ -6,17 +6,15 @@ import { useEffect, useState } from 'react'
 interface Template {
   id: number
   name: string
-  subject: string
-  body: string
-  category: string
-  created_at: string
+  subject_template: string
+  body_template: string
+  is_default: boolean
 }
 
 export default function TemplatesPage() {
   const [templates, setTemplates] = useState<Template[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
-  const [categoryFilter, setCategoryFilter] = useState('')
 
   useEffect(() => {
     loadTemplates()
@@ -37,9 +35,7 @@ export default function TemplatesPage() {
   }
 
   const filteredTemplates = templates.filter(template => {
-    const matchesSearch = template.name.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesCategory = !categoryFilter || template.category === categoryFilter
-    return matchesSearch && matchesCategory
+    return template.name.toLowerCase().includes(searchTerm.toLowerCase())
   })
 
   return (
@@ -59,19 +55,6 @@ export default function TemplatesPage() {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <div className="filter-group">
-          <select
-            className="filter-select"
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-          >
-            <option value="">All Categories</option>
-            <option value="intro">Introduction</option>
-            <option value="follow_up">Follow Up</option>
-            <option value="value_prop">Value Proposition</option>
-            <option value="case_study">Case Study</option>
-          </select>
-        </div>
         <button className="btn-primary" onClick={() => alert('Create Template - Coming soon!')}>
           <i className="fas fa-plus"></i>
           New Template
@@ -89,14 +72,14 @@ export default function TemplatesPage() {
             <div key={template.id} className="template-card">
               <div className="template-card-header">
                 <h3 className="template-card-title">{template.name}</h3>
-                <span className="template-category">{template.category}</span>
+                {template.is_default && <span className="template-category">Default</span>}
               </div>
               <div className="template-card-body">
                 <div className="template-subject">
-                  <strong>Subject:</strong> {template.subject}
+                  <strong>Subject:</strong> {template.subject_template}
                 </div>
                 <div className="template-preview">
-                  {template.body ? template.body.substring(0, 150) : 'No preview available'}...
+                  {template.body_template ? template.body_template.substring(0, 150) : 'No preview available'}...
                 </div>
               </div>
               <div className="template-card-footer">
@@ -117,7 +100,7 @@ export default function TemplatesPage() {
           </div>
           <h3 className="empty-state-title">No Templates Found</h3>
           <p className="empty-state-description">
-            {searchTerm || categoryFilter
+            {searchTerm
               ? 'No templates match your search criteria.'
               : 'Create your first email template to use in campaigns.'}
           </p>

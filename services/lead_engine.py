@@ -3,10 +3,11 @@ Lead Engine Service
 Orchestrates the job search -> company enrichment -> POC extraction pipeline
 """
 
+import requests
 from typing import List, Dict, Optional, Generator
 from services.google_jobs_search import get_google_jobs_service
 from services.apollo_api import ApolloAPIService
-from services.api_keys import APOLLO_API_KEY
+from services.api_keys import APOLLO_API_KEY, GOOGLE_API_KEY, GOOGLE_SEARCH_ENGINE_ID
 from services.google_search import GoogleAPIQuotaExceeded
 
 
@@ -159,17 +160,52 @@ class LeadEngineService:
                         reveal_emails=False
                     )
 
+                # Fallback: people/search is blocked for this key.
+                # Step 1: Google search for VP/Senior/Director names at the company
+                # Step 2: Apollo People Enrichment (people/match) with each name → verified emails
                 if not pocs:
-                    print(f"[Skip] {company_name} - No POCs found")
+                    print(f"[POC] People search returned empty, searching for senior contacts...")
+                    senior_names = self._find_senior_names(company_name, domain)
+                    print(f"[POC] Found {len(senior_names)} senior name(s) via Google for {company_name}")
+
+                    enriched_pocs = []
+                    for entry in senior_names[:5]:
+                        enriched = self.apollo_service.enrich_person(
+                            first_name=entry['first_name'],
+                            last_name=entry['last_name'],
+                            domain=domain,
+                            linkedin_url=entry.get('linkedin_url'),
+                            reveal_emails=True
+                        )
+                        if enriched and enriched.get('email'):
+                            enriched_pocs.append(enriched)
+                            print(f"[POC] {enriched.get('name')} → {enriched.get('email')} ({enriched.get('email_status')})")
+                        if len(enriched_pocs) >= 3:
+                            break
+
+                    if enriched_pocs:
+                        pocs = enriched_pocs
+                    else:
+                        print(f"[POC] No senior contacts enriched, using info@{domain} as fallback")
+                        pocs = [{
+                            'name': '',
+                            'email': f'info@{domain}',
+                            'title': '',
+                            'email_status': 'guessed',
+                            'id': '',
+                            'phone_numbers': [],
+                            'linkedin_url': ''
+                        }]
+
+                if not pocs:
+                    print(f"[Note] {company_name} - No POCs found, saving company without contacts")
                     skipped_no_pocs += 1
-                    continue
-
-                # Use bulk_match to reveal emails for all POCs at once
-                # Add domain to each POC for better matching
-                for poc in pocs:
-                    poc['domain'] = domain
-
-                pocs = self.apollo_service.bulk_reveal_emails(pocs)
+                else:
+                    # If pocs came from find_contacts (no emails yet), do bulk reveal
+                    if not any(p.get('email') for p in pocs):
+                        for poc in pocs:
+                            poc['domain'] = domain
+                        pocs = self.apollo_service.bulk_reveal_emails(pocs)
 
                 # Build lead entry
                 website = company_data.get('website_url') or f'https://{domain}'
@@ -238,6 +274,49 @@ class LeadEngineService:
         print(f"Skipped - Size Filter: {skipped_size}")
         print(f"Skipped - No POCs: {skipped_no_pocs}")
         print(f"{'='*60}\n")
+
+    def _find_senior_names(self, company_name: str, domain: str) -> List[Dict]:
+        """Search Google for VP/Senior/Director names at a company via LinkedIn profiles.
+        Returns list of dicts with first_name, last_name, linkedin_url."""
+        try:
+            query = f'"{company_name}" "VP" OR "Senior VP" OR "Director" OR "Head of" OR "Senior" site:linkedin.com'
+            response = requests.get(
+                'https://www.googleapis.com/customsearch/v1',
+                params={
+                    'key': GOOGLE_API_KEY,
+                    'cx': GOOGLE_SEARCH_ENGINE_ID,
+                    'q': query,
+                    'num': 10
+                }
+            )
+            if response.status_code != 200:
+                print(f"[WARN] Google search returned {response.status_code} for {company_name}")
+                return []
+
+            items = response.json().get('items', [])
+            names = []
+            seen = set()
+            for item in items:
+                title = item.get('title', '')
+                link = item.get('link', '')
+                # LinkedIn titles: "FirstName LastName - Title at Company"
+                name_part = title.split(' - ')[0].strip()
+                words = name_part.split()
+                # Valid name: 2-4 words, each starts with uppercase letter
+                if 2 <= len(words) <= 4 and all(w[0].isupper() for w in words if w):
+                    key = name_part.lower()
+                    if key not in seen:
+                        seen.add(key)
+                        names.append({
+                            'first_name': words[0],
+                            'last_name': words[-1],
+                            'linkedin_url': link if 'linkedin.com' in link else ''
+                        })
+            return names
+
+        except Exception as e:
+            print(f"[WARN] Google search for senior names at {company_name} failed: {e}")
+            return []
 
     def _format_location(self, company_data: Dict) -> str:
         """Format location string from company data"""

@@ -244,14 +244,14 @@ class ApolloAPIService:
             print(f"   Reveal emails: {reveal_emails}")
             print(f"   Per page: {per_page}")
 
-            url = f"{self.base_url}/api/v1/mixed_people/search"
+            url = f"{self.base_url}/api/v1/people/search"
 
             payload = {
-                'q_organization_domains': domain,
+                'api_key': self.api_key,
+                'organization_domains': [domain],
                 'page': 1,
                 'per_page': per_page,
                 'reveal_personal_emails': reveal_emails
-                # Note: reveal_phone_number requires webhook_url parameter
             }
 
             # Add title filter only if specified
@@ -270,6 +270,8 @@ class ApolloAPIService:
                 print(f"   Departments: {departments}")
 
             response = requests.post(url, json=payload, headers=self.headers)
+            if response.status_code != 200:
+                print(f"   [DEBUG] Apollo {response.status_code} response: {response.text[:500]}")
             response.raise_for_status()
             data = response.json()
 
@@ -373,10 +375,10 @@ class ApolloAPIService:
                 print(f"   Company size: {organization_num_employees_ranges}")
             print(f"   Reveal emails: {reveal_emails}")
 
-            # Use correct Apollo API endpoint
-            url = f"{self.base_url}/api/v1/mixed_people/search"
+            url = f"{self.base_url}/api/v1/people/search"
 
             payload = {
+                'api_key': self.api_key,
                 'page': page,
                 'per_page': min(per_page, 100),  # Apollo max is 100
                 'reveal_personal_emails': reveal_emails
@@ -540,6 +542,10 @@ class ApolloAPIService:
                 if contact.get('linkedin_url'):
                     detail['linkedin_url'] = contact['linkedin_url']
 
+                # Add email if present (critical for matching)
+                if contact.get('email'):
+                    detail['email'] = contact['email']
+
                 # Add organization info for better matching
                 if contact.get('organization_name'):
                     detail['organization_name'] = contact['organization_name']
@@ -556,14 +562,13 @@ class ApolloAPIService:
                 print("[WARN] No valid contact details for bulk match")
                 return contacts
 
-            # Include reveal_personal_emails in payload body (same pattern as /people/match endpoint)
             payload = {
+                'api_key': self.api_key,
                 'details': details,
                 'reveal_personal_emails': True
             }
 
             print(f"\n   URL: {url}")
-            print(f"   Payload keys: {list(payload.keys())}")
             print(f"   Sending {len(details)} contacts to bulk_match...")
 
             response = requests.post(url, json=payload, headers=self.headers)
@@ -657,12 +662,14 @@ class ApolloAPIService:
             url = f"{self.base_url}/api/v1/people/match"
 
             payload = {
+                'api_key': self.api_key,
                 'id': person_id,
-                'reveal_personal_emails': True
-                # Note: reveal_phone_number requires webhook_url, so we skip it
+                'reveal_personal_emails': True,
             }
 
             response = requests.post(url, json=payload, headers=self.headers)
+            if response.status_code != 200:
+                print(f"   [DEBUG] Apollo {response.status_code}: {response.text[:500]}")
             response.raise_for_status()
             data = response.json()
 
@@ -718,9 +725,8 @@ class ApolloAPIService:
             # Apollo People Enrichment endpoint - note the /api/v1 path
             url = f"{self.base_url}/api/v1/people/match"
 
-            # Build payload - DO NOT include api_key (it's in the header)
-            # Note: reveal_phone_number requires webhook_url parameter, so we skip it
             payload = {
+                'api_key': self.api_key,
                 'reveal_personal_emails': reveal_emails
             }
 

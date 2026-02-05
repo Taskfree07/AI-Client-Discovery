@@ -1831,6 +1831,177 @@ button {
   color: var(--green);
 }
 
+/* Lead Option Import Button */
+.lead-option-import-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 7px 14px;
+  background: var(--primary-blue);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.lead-option-import-btn:hover {
+  background: #2563eb;
+}
+
+.lead-option-import-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.lead-option-import-btn.add-btn {
+  background: var(--green);
+}
+
+.lead-option-import-btn.add-btn:hover {
+  background: #16a34a;
+}
+
+/* Manual Entry Form */
+.manual-form-section {
+  background: var(--bg-light);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 18px 20px;
+  margin-top: 4px;
+  margin-bottom: 8px;
+}
+
+.manual-form-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+}
+
+.manual-form-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.manual-form-input {
+  flex: 1 1 150px;
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 14px;
+  background: var(--bg-white);
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.manual-form-input:focus {
+  border-color: var(--primary-blue);
+}
+
+.manual-form-input::placeholder {
+  color: var(--text-muted);
+}
+
+/* Added Leads Section */
+.added-leads-section {
+  margin-top: 24px;
+}
+
+.added-leads-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.added-leads-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.added-leads-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 8px;
+  background: var(--primary-blue);
+  color: #fff;
+  border-radius: 11px;
+  font-size: 13px;
+  font-weight: 600;
+  margin-left: 8px;
+}
+
+.added-leads-clear {
+  font-size: 13px;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 0;
+  transition: color 0.15s;
+}
+
+.added-leads-clear:hover {
+  color: #dc2626;
+}
+
+/* Source Badges */
+.source-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.source-badge.csv {
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--primary-blue);
+}
+
+.source-badge.lead-engine {
+  background: rgba(124, 58, 237, 0.1);
+  color: #7C3AED;
+}
+
+.source-badge.manual {
+  background: rgba(16, 185, 129, 0.1);
+  color: #059669;
+}
+
+/* Lead Row Remove Button */
+.lead-row-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.lead-row-remove:hover {
+  color: #dc2626;
+  background: rgba(220, 38, 38, 0.08);
+}
+
 /* Templates Selection */
 .templates-grid {
   display: grid;

@@ -8,7 +8,7 @@ GOOGLE_API_KEY = "AIzaSyCv-K-5hDF4m-rb3BI0fhiH-NLpRwVQeXU"
 GOOGLE_SEARCH_ENGINE_ID = "76b918ebfb2c247ee"
 
 # Apollo API
-APOLLO_API_KEY = "7POGBYCC6etw1Xla92Mjqg"
+APOLLO_API_KEY = "tY-idLVz3uh3XxYm5eir5w"
 
 # API Endpoints
 GOOGLE_SEARCH_URL = "https://www.googleapis.com/customsearch/v1"

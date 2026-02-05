@@ -91,11 +91,6 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
                 </Link>
               </div>
               <div className="nav-item">
-                <Link href="/campaign-manager/new" className={`nav-link ${isActive('/campaign-manager/new') ? 'active' : ''}`}>
-                  <span>Campaign Builder</span>
-                </Link>
-              </div>
-              <div className="nav-item">
                 <Link href="/campaign-manager/templates" className={`nav-link ${isActive('/campaign-manager/templates') ? 'active' : ''}`}>
                   <span>Email Templates</span>
                 </Link>

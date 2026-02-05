@@ -361,17 +361,27 @@ export default function SessionManagerPage() {
     const rows: string[][] = []
 
     for (const lead of leads) {
-      for (const poc of lead.pocs) {
+      if (lead.pocs.length > 0) {
+        for (const poc of lead.pocs) {
+          rows.push([
+            lead.company.name,
+            lead.company.industry,
+            String(lead.company.size),
+            lead.job_opening,
+            poc.name,
+            poc.title,
+            poc.email,
+            poc.phone || '',
+            poc.linkedin_url || ''
+          ])
+        }
+      } else {
         rows.push([
           lead.company.name,
           lead.company.industry,
           String(lead.company.size),
           lead.job_opening,
-          poc.name,
-          poc.title,
-          poc.email,
-          poc.phone || '',
-          poc.linkedin_url || ''
+          '', '', '', '', ''
         ])
       }
     }
@@ -515,32 +525,45 @@ export default function SessionManagerPage() {
                 </thead>
                 <tbody>
                   {leads.map((lead, leadIndex) =>
-                    lead.pocs.map((poc, pocIndex) => (
-                      <tr key={`${leadIndex}-${pocIndex}`}>
-                        <td className="company-cell">
-                          <div className="company-name">{lead.company.name}</div>
-                          <div className="company-meta">
-                            {lead.company.industry} - {lead.company.size} employees
-                          </div>
-                        </td>
-                        <td>{lead.job_opening}</td>
-                        <td>
-                          <div className="poc-name">{poc.name}</div>
-                          <div className="poc-subtitle">{poc.title}</div>
-                        </td>
-                        <td>{poc.title}</td>
-                        <td>
-                          <a href={`mailto:${poc.email}`} className="email-link">{poc.email}</a>
-                        </td>
-                        <td>
-                          {poc.linkedin_url ? (
-                            <a href={poc.linkedin_url} target="_blank" rel="noopener noreferrer" className="linkedin-link">
-                              linkedin.com/in/...
-                            </a>
-                          ) : '-'}
-                        </td>
-                      </tr>
-                    ))
+                    lead.pocs.length > 0
+                      ? lead.pocs.map((poc, pocIndex) => (
+                          <tr key={`${leadIndex}-${pocIndex}`}>
+                            <td className="company-cell">
+                              <div className="company-name">{lead.company.name}</div>
+                              <div className="company-meta">
+                                {lead.company.industry} - {lead.company.size} employees
+                              </div>
+                            </td>
+                            <td>{lead.job_opening}</td>
+                            <td>
+                              <div className="poc-name">{poc.name}</div>
+                              <div className="poc-subtitle">{poc.title}</div>
+                            </td>
+                            <td>{poc.title}</td>
+                            <td>
+                              <a href={`mailto:${poc.email}`} className="email-link">{poc.email}</a>
+                            </td>
+                            <td>
+                              {poc.linkedin_url ? (
+                                <a href={poc.linkedin_url} target="_blank" rel="noopener noreferrer" className="linkedin-link">
+                                  linkedin.com/in/...
+                                </a>
+                              ) : '-'}
+                            </td>
+                          </tr>
+                        ))
+                      : (
+                          <tr key={`${leadIndex}-nopoc`}>
+                            <td className="company-cell">
+                              <div className="company-name">{lead.company.name}</div>
+                              <div className="company-meta">
+                                {lead.company.industry} - {lead.company.size} employees
+                              </div>
+                            </td>
+                            <td>{lead.job_opening}</td>
+                            <td colSpan={4} style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>No contacts found</td>
+                          </tr>
+                        )
                   )}
                 </tbody>
               </table>
