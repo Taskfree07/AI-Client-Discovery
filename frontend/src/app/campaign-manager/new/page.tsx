@@ -30,6 +30,11 @@ interface AddedLead {
   source: 'csv' | 'lead-engine' | 'manual'
 }
 
+interface ValidatedLead extends AddedLead {
+  issue?: string
+  isFlagged: boolean
+}
+
 interface CampaignFormData {
   campaign_name: string
   selected_session_id: number | null
@@ -69,9 +74,13 @@ export default function CampaignBuilderPage() {
   const [showLeadEngineDrawer, setShowLeadEngineDrawer] = useState(false)
   const [selectedSessionIds, setSelectedSessionIds] = useState<Set<number>>(new Set())
   const [drawerStep, setDrawerStep] = useState<'sessions' | 'leads'>('sessions')
-  const [drawerLeads, setDrawerLeads] = useState<AddedLead[]>([])
+  const [drawerLeads, setDrawerLeads] = useState<ValidatedLead[]>([])
+  const [flaggedLeads, setFlaggedLeads] = useState<ValidatedLead[]>([])
+  const [detectedLeads, setDetectedLeads] = useState<ValidatedLead[]>([])
   const [selectedLeadIds, setSelectedLeadIds] = useState<Set<string>>(new Set())
   const [loadingDrawerLeads, setLoadingDrawerLeads] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState<'flagged' | 'detected' | null>(null)
+  const [editingLead, setEditingLead] = useState<ValidatedLead | null>(null)
 
   const [formData, setFormData] = useState<CampaignFormData>({
     campaign_name: '',
@@ -199,48 +208,152 @@ export default function CampaignBuilderPage() {
     return result
   }
 
+  const validateLead = (lead: AddedLead): ValidatedLead => {
+    const issues: string[] = []
+    
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!lead.email || !lead.email.trim()) {
+      issues.push('Missing email')
+    } else if (!emailRegex.test(lead.email)) {
+      issues.push('Invalid email id')
+    }
+    
+    // Name validation
+    if (!lead.name || !lead.name.trim()) {
+      issues.push('Invalid name')
+    } else if (lead.name.length < 2) {
+      issues.push('Invalid name')
+    }
+    
+    // Company validation
+    if (!lead.company || !lead.company.trim()) {
+      issues.push('Invalid Company name')
+    }
+    
+    // Check for incomplete/incorrect format
+    if (!lead.email.includes('@') && lead.email.length > 0) {
+      issues.push('Incorrect format')
+    }
+    
+    // Missing details check
+    if (!lead.title && !lead.jobTitle) {
+      issues.push('Missing details')
+    }
+    
+    const issue = issues.length > 0 ? issues[0] : undefined
+    
+    return {
+      ...lead,
+      issue,
+      isFlagged: issues.length > 0
+    }
+  }
+
   const handleCSVUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+    
+    console.log('CSV file selected:', file.name)
+    
     const reader = new FileReader()
     reader.onload = (event) => {
-      const text = event.target?.result as string
-      const lines = text.split(/\r?\n/).filter(l => l.trim())
-      if (lines.length < 2) return
-      const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase())
-      const colMap = {
-        name: headers.findIndex(h => h.includes('name') && !h.includes('company')),
-        email: headers.findIndex(h => h.includes('email')),
-        company: headers.findIndex(h => h.includes('company')),
-        title: headers.findIndex(h => h.includes('title')),
-        jobOpening: headers.findIndex(h => h.includes('job'))
-      }
-      const newLeads: AddedLead[] = []
-      for (let i = 1; i < lines.length; i++) {
-        const cols = parseCSVLine(lines[i])
-        const email = colMap.email >= 0 ? cols[colMap.email] : ''
-        if (!email) continue
-        newLeads.push({
-          id: `csv-${Date.now()}-${i}`,
-          name: colMap.name >= 0 ? cols[colMap.name] : '',
-          email,
-          company: colMap.company >= 0 ? cols[colMap.company] : '',
-          title: colMap.title >= 0 ? cols[colMap.title] : '',
-          jobTitle: colMap.jobOpening >= 0 ? cols[colMap.jobOpening] : '',
-          source: 'csv'
+      try {
+        const text = event.target?.result as string
+        console.log('CSV content loaded, length:', text.length)
+        
+        const lines = text.split(/\r?\n/).filter(l => l.trim())
+        console.log('CSV lines:', lines.length)
+        
+        if (lines.length < 2) {
+          alert('CSV file must have at least a header row and one data row')
+          return
+        }
+        
+        const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase())
+        console.log('CSV headers:', headers)
+        
+        const colMap = {
+          name: headers.findIndex(h => h.includes('name') && !h.includes('company')),
+          email: headers.findIndex(h => h.includes('email')),
+          company: headers.findIndex(h => h.includes('company')),
+          title: headers.findIndex(h => h.includes('title')),
+          jobOpening: headers.findIndex(h => h.includes('job'))
+        }
+        console.log('Column mapping:', colMap)
+        
+        if (colMap.email < 0) {
+          alert('CSV file must have an "email" column')
+          return
+        }
+        
+        const newLeads: AddedLead[] = []
+        for (let i = 1; i < lines.length; i++) {
+          const cols = parseCSVLine(lines[i])
+          const email = colMap.email >= 0 ? cols[colMap.email]?.trim() : ''
+          if (!email) continue
+          
+          newLeads.push({
+            id: `csv-${Date.now()}-${i}`,
+            name: colMap.name >= 0 ? (cols[colMap.name]?.trim() || '') : '',
+            email,
+            company: colMap.company >= 0 ? (cols[colMap.company]?.trim() || '') : '',
+            title: colMap.title >= 0 ? (cols[colMap.title]?.trim() || '') : '',
+            jobTitle: colMap.jobOpening >= 0 ? (cols[colMap.jobOpening]?.trim() || '') : '',
+            source: 'csv'
+          })
+        }
+        
+        console.log('Parsed leads:', newLeads.length)
+        
+        if (newLeads.length === 0) {
+          alert('No valid leads found in CSV file. Make sure the email column is not empty.')
+          return
+        }
+        
+        // Deduplicate within the CSV file first
+        const uniqueNewLeads: AddedLead[] = []
+        const seenEmails = new Set<string>()
+        newLeads.forEach(lead => {
+          const emailLower = lead.email.toLowerCase()
+          if (!seenEmails.has(emailLower)) {
+            seenEmails.add(emailLower)
+            uniqueNewLeads.push(lead)
+          }
         })
+        
+        console.log('Unique leads after deduplication:', uniqueNewLeads.length)
+        
+        // Then deduplicate against existing leads
+        setAddedLeads(prev => {
+          const existingEmails = new Set(prev.map(l => l.email.toLowerCase()))
+          const deduped = uniqueNewLeads.filter(l => !existingEmails.has(l.email.toLowerCase()))
+          console.log('Leads to add (after removing existing):', deduped.length)
+          
+          if (deduped.length === 0) {
+            alert('All leads from CSV already exist in the campaign')
+            return prev
+          }
+          
+          alert(`Successfully added ${deduped.length} leads from CSV`)
+          return [...prev, ...deduped]
+        })
+      } catch (error) {
+        console.error('Error parsing CSV:', error)
+        alert('Error parsing CSV file. Please check the file format.')
       }
-      setAddedLeads(prev => {
-        const existingEmails = new Set(prev.map(l => l.email.toLowerCase()))
-        const deduped = newLeads.filter(l => !existingEmails.has(l.email.toLowerCase()))
-        return [...prev, ...deduped]
-      })
     }
+    
+    reader.onerror = () => {
+      console.error('Error reading file')
+      alert('Error reading CSV file')
+    }
+    
     reader.readAsText(file)
     e.target.value = ''
   }
 
-  const handleDrawerNextToLeads = async () => {
+  const handleAddLeadsFromSessions = async () => {
     if (selectedSessionIds.size === 0) return
     setLoadingDrawerLeads(true)
     try {
@@ -270,9 +383,24 @@ export default function CampaignBuilderPage() {
           })
         }
       }
-      setDrawerLeads(allLeads)
-      setSelectedLeadIds(new Set())
-      setDrawerStep('leads')
+      // Deduplicate within the new batch first
+      const uniqueNewLeads: AddedLead[] = []
+      const seenEmails = new Set<string>()
+      allLeads.forEach(lead => {
+        const emailLower = lead.email.toLowerCase()
+        if (!seenEmails.has(emailLower)) {
+          seenEmails.add(emailLower)
+          uniqueNewLeads.push(lead)
+        }
+      })
+      // Then deduplicate against existing leads
+      setAddedLeads(prev => {
+        const existingEmails = new Set(prev.map(l => l.email.toLowerCase()))
+        const deduped = uniqueNewLeads.filter(l => !existingEmails.has(l.email.toLowerCase()))
+        return [...prev, ...deduped]
+      })
+      setShowLeadEngineDrawer(false)
+      setSelectedSessionIds(new Set())
     } catch (error) {
       console.error('Error loading session leads:', error)
     } finally {
@@ -280,11 +408,148 @@ export default function CampaignBuilderPage() {
     }
   }
 
-  const handleSaveAndNextLeads = () => {
+
+
+  const handleViewSession = async (sessionId: number) => {
+    setSelectedSessionIds(new Set([sessionId]))
+    setLoadingDrawerLeads(true)
+    try {
+      const response = await fetch(`/api/sessions/${sessionId}`)
+      if (response.ok) {
+        const data = await response.json()
+        const leads = data.leads || []
+        const allLeads: AddedLead[] = []
+        leads.forEach((lead: any) => {
+          const company = lead.company?.name || ''
+          const jobOpening = lead.job_opening || ''
+          const pocs = lead.pocs || []
+          pocs.forEach((poc: any, idx: number) => {
+            if (poc.email) {
+              allLeads.push({
+                id: `view-${lead.id || Date.now()}-${idx}`,
+                name: poc.name || '',
+                email: poc.email,
+                company,
+                title: poc.title || '',
+                jobTitle: jobOpening,
+                source: 'lead-engine'
+              })
+            }
+          })
+        })
+        
+        // Validate all leads
+        const validatedLeads = allLeads.map(lead => validateLead(lead))
+        
+        // Split into flagged and detected
+        const flagged = validatedLeads.filter(lead => lead.isFlagged)
+        const detected = validatedLeads.filter(lead => !lead.isFlagged)
+        
+        setDrawerLeads(validatedLeads)
+        setFlaggedLeads(flagged)
+        setDetectedLeads(detected)
+        setSelectedLeadIds(new Set())
+        setDrawerStep('leads')
+      }
+    } catch (error) {
+      console.error('Error loading session leads:', error)
+    } finally {
+      setLoadingDrawerLeads(false)
+    }
+  }
+
+  const toggleLeadSelection = (leadId: string) => {
+    setSelectedLeadIds(prev => {
+      const next = new Set(prev)
+      if (next.has(leadId)) {
+        next.delete(leadId)
+      } else {
+        next.add(leadId)
+      }
+      return next
+    })
+  }
+
+  const handleDeleteAll = (section: 'flagged' | 'detected') => {
+    setShowDeleteModal(section)
+  }
+
+  const confirmDeleteAll = () => {
+    if (showDeleteModal === 'flagged') {
+      setDrawerLeads(prev => prev.filter(lead => !lead.isFlagged))
+      setFlaggedLeads([])
+      setSelectedLeadIds(prev => {
+        const next = new Set(prev)
+        flaggedLeads.forEach(lead => next.delete(lead.id))
+        return next
+      })
+    } else if (showDeleteModal === 'detected') {
+      setDrawerLeads(prev => prev.filter(lead => lead.isFlagged))
+      setDetectedLeads([])
+      setSelectedLeadIds(prev => {
+        const next = new Set(prev)
+        detectedLeads.forEach(lead => next.delete(lead.id))
+        return next
+      })
+    }
+    setShowDeleteModal(null)
+  }
+
+  const handleEditLead = (lead: ValidatedLead) => {
+    setEditingLead({ ...lead })
+  }
+
+  const handleSaveEditedLead = () => {
+    if (!editingLead) return
+    
+    // Re-validate the edited lead
+    const validated = validateLead(editingLead)
+    
+    // Update in drawerLeads
+    setDrawerLeads(prev => prev.map(l => l.id === editingLead.id ? validated : l))
+    
+    // Update in flagged or detected lists
+    if (validated.isFlagged) {
+      setFlaggedLeads(prev => {
+        const filtered = prev.filter(l => l.id !== editingLead.id)
+        return [...filtered, validated]
+      })
+      setDetectedLeads(prev => prev.filter(l => l.id !== editingLead.id))
+    } else {
+      setDetectedLeads(prev => {
+        const filtered = prev.filter(l => l.id !== editingLead.id)
+        return [...filtered, validated]
+      })
+      setFlaggedLeads(prev => prev.filter(l => l.id !== editingLead.id))
+    }
+    
+    setEditingLead(null)
+  }
+
+  const toggleSelectAllLeads = () => {
+    if (selectedLeadIds.size === drawerLeads.length) {
+      setSelectedLeadIds(new Set())
+    } else {
+      setSelectedLeadIds(new Set(drawerLeads.map(l => l.id)))
+    }
+  }
+
+  const handleSaveAndAddLeads = () => {
     const leadsToImport = drawerLeads.filter(l => selectedLeadIds.has(l.id))
+    // Deduplicate within the selected batch first
+    const uniqueNewLeads: AddedLead[] = []
+    const seenEmails = new Set<string>()
+    leadsToImport.forEach(lead => {
+      const emailLower = lead.email.toLowerCase()
+      if (!seenEmails.has(emailLower)) {
+        seenEmails.add(emailLower)
+        uniqueNewLeads.push(lead)
+      }
+    })
+    // Then deduplicate against existing leads
     setAddedLeads(prev => {
       const existingEmails = new Set(prev.map(l => l.email.toLowerCase()))
-      const deduped = leadsToImport.filter(l => !existingEmails.has(l.email.toLowerCase()))
+      const deduped = uniqueNewLeads.filter(l => !existingEmails.has(l.email.toLowerCase()))
       return [...prev, ...deduped]
     })
     setShowLeadEngineDrawer(false)
@@ -304,26 +569,6 @@ export default function CampaignBuilderPage() {
       }
       return next
     })
-  }
-
-  const toggleLeadSelection = (leadId: string) => {
-    setSelectedLeadIds(prev => {
-      const next = new Set(prev)
-      if (next.has(leadId)) {
-        next.delete(leadId)
-      } else {
-        next.add(leadId)
-      }
-      return next
-    })
-  }
-
-  const toggleSelectAllLeads = () => {
-    if (selectedLeadIds.size === drawerLeads.length) {
-      setSelectedLeadIds(new Set())
-    } else {
-      setSelectedLeadIds(new Set(drawerLeads.map(l => l.id)))
-    }
   }
 
   const handleAddManual = () => {
@@ -890,7 +1135,7 @@ export default function CampaignBuilderPage() {
                 </div>
 
                 <div className="le-drawer-body">
-                  <h3 className="le-drawer-section-title">Saved Campaigns</h3>
+                  <h3 className="le-drawer-section-title">Saved Sessions</h3>
 
                   {loadingSessions ? (
                     <div className="loading-text">Loading sessions...</div>
@@ -918,7 +1163,7 @@ export default function CampaignBuilderPage() {
                               onClick={(e) => {
                                 e.preventDefault()
                                 e.stopPropagation()
-                                window.open(`/session-manager?session=${session.id}`, '_blank')
+                                handleViewSession(session.id)
                               }}
                             >
                               View
@@ -939,86 +1184,188 @@ export default function CampaignBuilderPage() {
                   <button
                     className="le-drawer-next-btn"
                     disabled={selectedSessionIds.size === 0 || loadingDrawerLeads}
-                    onClick={handleDrawerNextToLeads}
+                    onClick={handleAddLeadsFromSessions}
                   >
-                    {loadingDrawerLeads ? 'Loading...' : 'Next'}
+                    <i className="fas fa-plus"></i>
+                    {loadingDrawerLeads ? 'Loading...' : 'Add Leads'}
                   </button>
                 </div>
               </>
             )}
 
-            {/* === STEP 2: Leads Table === */}
+            {/* === STEP 2: Leads Validation === */}
             {drawerStep === 'leads' && (
               <>
                 <div className="le-drawer-breadcrumb">
                   <span className="le-drawer-breadcrumb-parent">Add leads</span>
                   <i className="fas fa-chevron-right le-drawer-breadcrumb-sep"></i>
-                  <span className="le-drawer-breadcrumb-parent">Lead Engine</span>
+                  <span className="le-drawer-breadcrumb-parent">Upload File</span>
                   <i className="fas fa-chevron-right le-drawer-breadcrumb-sep"></i>
-                  <span className="le-drawer-breadcrumb-current">Leads</span>
+                  <span className="le-drawer-breadcrumb-current">Detected Leads</span>
                 </div>
-
-                <div className="le-drawer-body">
-                  <div className="le-drawer-leads-header">
-                    <h3 className="le-drawer-section-title">Leads</h3>
-                    <label className="le-drawer-select-all">
-                      <input
-                        type="checkbox"
-                        checked={drawerLeads.length > 0 && selectedLeadIds.size === drawerLeads.length}
-                        onChange={toggleSelectAllLeads}
-                      />
-                      Select All
-                    </label>
-                  </div>
-
-                  {loadingDrawerLeads ? (
-                    <div className="loading-text">Loading leads...</div>
-                  ) : drawerLeads.length > 0 ? (
-                    <>
-                      <div className="le-drawer-leads-table-wrap">
-                        <table className="le-drawer-leads-table">
-                          <thead>
-                            <tr>
-                              <th style={{ width: '40px' }}></th>
-                              <th>Name</th>
-                              <th>Company</th>
-                              <th>Title</th>
-                              <th>Email</th>
-                              <th style={{ width: '50px' }}>Action</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {drawerLeads.map(lead => (
-                              <tr key={lead.id} className={selectedLeadIds.has(lead.id) ? 'selected' : ''}>
-                                <td>
-                                  <input
-                                    type="checkbox"
-                                    className="le-drawer-checkbox"
-                                    checked={selectedLeadIds.has(lead.id)}
-                                    onChange={() => toggleLeadSelection(lead.id)}
-                                  />
-                                </td>
-                                <td>{lead.name || '—'}</td>
-                                <td>{lead.company || '—'}</td>
-                                <td>{lead.title || lead.jobTitle || '—'}</td>
-                                <td>{lead.email}</td>
-                                <td>
-                                  <i className="fas fa-pen le-drawer-action-icon"></i>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                
+                {loadingDrawerLeads ? (
+                  <div className="loading-text" style={{ padding: '40px', textAlign: 'center' }}>Loading leads...</div>
+                ) : (
+                  <>
+                    {/* Validation Summary */}
+                    <div className="le-validation-summary">
+                      <div className="le-validation-tab">
+                        <i className="fas fa-exclamation-triangle" style={{ color: '#f59e0b', marginRight: '8px' }}></i>
+                        Flagged Leads : <strong>{flaggedLeads.length}</strong>
                       </div>
-                      <button className="le-drawer-add-leads-btn">
-                        <i className="fas fa-plus"></i> Add leads
-                      </button>
-                    </>
-                  ) : (
-                    <p className="no-data-text">No leads found in selected session(s).</p>
-                  )}
-                </div>
+                      <div className="le-validation-tab">
+                        <i className="fas fa-check-circle" style={{ color: '#10b981', marginRight: '8px' }}></i>
+                        Detected Leads : <strong>{detectedLeads.length}</strong>
+                      </div>
+                    </div>
 
+                    <div className="le-drawer-body" style={{ paddingTop: '0' }}>
+                      {/* Flagged Leads Section */}
+                      {flaggedLeads.length > 0 && (
+                        <div className="le-leads-section">
+                          <div className="le-leads-section-header">
+                            <h3 className="le-leads-section-title">Flagged Leads</h3>
+                            <div className="le-leads-section-actions">
+                              <button className="le-btn-text" onClick={() => handleDeleteAll('flagged')}>
+                                <i className="fas fa-trash"></i> Delete All
+                              </button>
+                              <label className="le-drawer-select-all">
+                                <input
+                                  type="checkbox"
+                                  checked={flaggedLeads.length > 0 && flaggedLeads.every(lead => selectedLeadIds.has(lead.id))}
+                                  onChange={() => {
+                                    setSelectedLeadIds(prev => {
+                                      const next = new Set(prev)
+                                      const allSelected = flaggedLeads.every(lead => prev.has(lead.id))
+                                      if (allSelected) {
+                                        flaggedLeads.forEach(lead => next.delete(lead.id))
+                                      } else {
+                                        flaggedLeads.forEach(lead => next.add(lead.id))
+                                      }
+                                      return next
+                                    })
+                                  }}
+                                />
+                                Select All
+                              </label>
+                            </div>
+                          </div>
+                          <div className="le-drawer-leads-table-wrap">
+                            <table className="le-drawer-leads-table">
+                              <thead>
+                                <tr>
+                                  <th style={{ width: '40px' }}></th>
+                                  <th>Name</th>
+                                  <th>Company</th>
+                                  <th>Email</th>
+                                  <th>Issue</th>
+                                  <th style={{ width: '60px' }}>Action</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {flaggedLeads.map(lead => (
+                                  <tr key={lead.id} className={selectedLeadIds.has(lead.id) ? 'selected' : ''}>
+                                    <td>
+                                      <input
+                                        type="checkbox"
+                                        className="le-drawer-checkbox"
+                                        checked={selectedLeadIds.has(lead.id)}
+                                        onChange={() => toggleLeadSelection(lead.id)}
+                                      />
+                                    </td>
+                                    <td>{lead.name || '—'}</td>
+                                    <td>{lead.company || '—'}</td>
+                                    <td>{lead.email || '—'}</td>
+                                    <td><span className="le-issue-badge">{lead.issue}</span></td>
+                                    <td>
+                                      <button className="le-action-edit-btn" onClick={() => handleEditLead(lead)} title="Edit">
+                                        <i className="fas fa-pen"></i>
+                                      </button>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Detected Leads Section */}
+                      {detectedLeads.length > 0 && (
+                        <div className="le-leads-section" style={{ marginTop: flaggedLeads.length > 0 ? '24px' : '0' }}>
+                          <div className="le-leads-section-header">
+                            <h3 className="le-leads-section-title">Detected Leads</h3>
+                            <div className="le-leads-section-actions">
+                              <button className="le-btn-text" onClick={() => handleDeleteAll('detected')}>
+                                <i className="fas fa-trash"></i> Delete All
+                              </button>
+                              <label className="le-drawer-select-all">
+                                <input
+                                  type="checkbox"
+                                  checked={detectedLeads.length > 0 && detectedLeads.every(lead => selectedLeadIds.has(lead.id))}
+                                  onChange={() => {
+                                    setSelectedLeadIds(prev => {
+                                      const next = new Set(prev)
+                                      const allSelected = detectedLeads.every(lead => prev.has(lead.id))
+                                      if (allSelected) {
+                                        detectedLeads.forEach(lead => next.delete(lead.id))
+                                      } else {
+                                        detectedLeads.forEach(lead => next.add(lead.id))
+                                      }
+                                      return next
+                                    })
+                                  }}
+                                />
+                                Select All
+                              </label>
+                            </div>
+                          </div>
+                          <div className="le-drawer-leads-table-wrap">
+                            <table className="le-drawer-leads-table">
+                              <thead>
+                                <tr>
+                                  <th style={{ width: '40px' }}></th>
+                                  <th>Name</th>
+                                  <th>Company</th>
+                                  <th>Email</th>
+                                  <th style={{ width: '60px' }}>Action</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {detectedLeads.map(lead => (
+                                  <tr key={lead.id} className={selectedLeadIds.has(lead.id) ? 'selected' : ''}>
+                                    <td>
+                                      <input
+                                        type="checkbox"
+                                        className="le-drawer-checkbox"
+                                        checked={selectedLeadIds.has(lead.id)}
+                                        onChange={() => toggleLeadSelection(lead.id)}
+                                      />
+                                    </td>
+                                    <td>{lead.name || '—'}</td>
+                                    <td>{lead.company || '—'}</td>
+                                    <td>{lead.email || '—'}</td>
+                                    <td>
+                                      <button className="le-action-edit-btn" onClick={() => handleEditLead(lead)} title="Edit">
+                                        <i className="fas fa-pen"></i>
+                                      </button>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+
+                      {drawerLeads.length === 0 && (
+                        <p className="no-data-text">No leads found in selected session(s).</p>
+                      )}
+                    </div>
+                  </>
+                )}
+                
                 <div className="le-drawer-footer">
                   <button className="le-drawer-back-btn" onClick={() => setDrawerStep('sessions')}>
                     Back
@@ -1026,13 +1373,87 @@ export default function CampaignBuilderPage() {
                   <button
                     className="le-drawer-next-btn"
                     disabled={selectedLeadIds.size === 0}
-                    onClick={handleSaveAndNextLeads}
+                    onClick={handleSaveAndAddLeads}
                   >
-                    Save and Next
+                    <i className="fas fa-plus"></i>
+                    Add Leads
                   </button>
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="le-modal-overlay" onClick={() => setShowDeleteModal(null)}>
+          <div className="le-modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3 className="le-modal-title">Are you sure you want to delete this item?</h3>
+            <p className="le-modal-subtitle">This action cannot be undone.</p>
+            <div className="le-modal-actions">
+              <button className="le-modal-btn-cancel" onClick={() => setShowDeleteModal(null)}>
+                Cancel
+              </button>
+              <button className="le-modal-btn-delete" onClick={confirmDeleteAll}>
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Lead Modal */}
+      {editingLead && (
+        <div className="le-modal-overlay" onClick={() => setEditingLead(null)}>
+          <div className="le-modal-content le-edit-modal" onClick={(e) => e.stopPropagation()}>
+            <h3 className="le-modal-title">Edit Lead</h3>
+            <div className="le-edit-form">
+              <div className="le-edit-field">
+                <label>Name</label>
+                <input
+                  type="text"
+                  value={editingLead.name}
+                  onChange={(e) => setEditingLead({ ...editingLead, name: e.target.value })}
+                  placeholder="Enter name"
+                />
+              </div>
+              <div className="le-edit-field">
+                <label>Company</label>
+                <input
+                  type="text"
+                  value={editingLead.company}
+                  onChange={(e) => setEditingLead({ ...editingLead, company: e.target.value })}
+                  placeholder="Enter company"
+                />
+              </div>
+              <div className="le-edit-field">
+                <label>Email</label>
+                <input
+                  type="email"
+                  value={editingLead.email}
+                  onChange={(e) => setEditingLead({ ...editingLead, email: e.target.value })}
+                  placeholder="Enter email"
+                />
+              </div>
+              <div className="le-edit-field">
+                <label>Title</label>
+                <input
+                  type="text"
+                  value={editingLead.title}
+                  onChange={(e) => setEditingLead({ ...editingLead, title: e.target.value })}
+                  placeholder="Enter title"
+                />
+              </div>
+            </div>
+            <div className="le-modal-actions">
+              <button className="le-modal-btn-cancel" onClick={() => setEditingLead(null)}>
+                Cancel
+              </button>
+              <button className="le-modal-btn-save" onClick={handleSaveEditedLead}>
+                Save
+              </button>
+            </div>
           </div>
         </div>
       )}

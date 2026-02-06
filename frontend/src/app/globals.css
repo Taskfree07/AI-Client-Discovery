@@ -1892,7 +1892,7 @@ button {
 }
 
 .le-drawer {
-  width: 50vw;
+  width: 960px;
   height: 100vh;
   background: var(--bg-white);
   box-shadow: -8px 0 30px rgba(0, 0, 0, 0.12);
@@ -2225,6 +2225,233 @@ button {
 
 .le-drawer-add-leads-btn:hover {
   background: rgba(59, 130, 246, 0.06);
+}
+
+/* Validation Summary */
+.le-validation-summary {
+  display: flex;
+  gap: 16px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-white);
+}
+
+.le-validation-tab {
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  color: var(--text-primary);
+  padding: 8px 16px;
+  background: var(--bg-light);
+  border-radius: 6px;
+}
+
+.le-validation-tab strong {
+  margin-left: 4px;
+  font-weight: 600;
+}
+
+/* Leads Sections */
+.le-leads-section {
+  margin-bottom: 20px;
+}
+
+.le-leads-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.le-leads-section-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.le-leads-section-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.le-btn-text {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.15s;
+}
+
+.le-btn-text:hover {
+  background: var(--bg-light);
+  color: var(--primary-blue);
+}
+
+.le-issue-badge {
+  display: inline-block;
+  padding: 4px 8px;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 12px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.le-action-edit-btn {
+  background: none;
+  border: none;
+  color: var(--primary-blue);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.15s;
+}
+
+.le-action-edit-btn:hover {
+  background: rgba(59, 130, 246, 0.1);
+  color: #2563eb;
+}
+
+/* Modal Styles */
+.le-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+.le-modal-content {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 440px;
+  width: 90%;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.le-modal-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 8px 0;
+  text-align: center;
+}
+
+.le-modal-subtitle {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin: 0 0 24px 0;
+  text-align: center;
+}
+
+.le-modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.le-modal-btn-cancel {
+  padding: 10px 24px;
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.le-modal-btn-cancel:hover {
+  background: var(--bg-light);
+}
+
+.le-modal-btn-delete {
+  padding: 10px 24px;
+  background: #ef4444;
+  border: 1px solid #ef4444;
+  border-radius: 6px;
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.le-modal-btn-delete:hover {
+  background: #dc2626;
+  border-color: #dc2626;
+}
+
+.le-modal-btn-save {
+  padding: 10px 24px;
+  background: var(--primary-blue);
+  border: 1px solid var(--primary-blue);
+  border-radius: 6px;
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.le-modal-btn-save:hover {
+  background: #2563eb;
+  border-color: #2563eb;
+}
+
+/* Edit Modal */
+.le-edit-modal {
+  max-width: 500px;
+}
+
+.le-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.le-edit-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.le-edit-field label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.le-edit-field input {
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 14px;
+  color: var(--text-primary);
+  transition: all 0.15s;
+}
+
+.le-edit-field input:focus {
+  outline: none;
+  border-color: var(--primary-blue);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
 /* Manual Entry Form */
