@@ -66,6 +66,12 @@ export default function CampaignBuilderPage() {
   const [showManualForm, setShowManualForm] = useState(false)
   const [manualLead, setManualLead] = useState({ name: '', email: '', company: '', title: '' })
   const [importingSession, setImportingSession] = useState(false)
+  const [showLeadEngineDrawer, setShowLeadEngineDrawer] = useState(false)
+  const [selectedSessionIds, setSelectedSessionIds] = useState<Set<number>>(new Set())
+  const [drawerStep, setDrawerStep] = useState<'sessions' | 'leads'>('sessions')
+  const [drawerLeads, setDrawerLeads] = useState<AddedLead[]>([])
+  const [selectedLeadIds, setSelectedLeadIds] = useState<Set<string>>(new Set())
+  const [loadingDrawerLeads, setLoadingDrawerLeads] = useState(false)
 
   const [formData, setFormData] = useState<CampaignFormData>({
     campaign_name: '',
@@ -234,43 +240,89 @@ export default function CampaignBuilderPage() {
     e.target.value = ''
   }
 
-  const handleImportSession = async () => {
-    if (!formData.selected_session_id) return
-    setImportingSession(true)
+  const handleDrawerNextToLeads = async () => {
+    if (selectedSessionIds.size === 0) return
+    setLoadingDrawerLeads(true)
     try {
-      const response = await fetch(`/api/sessions/${formData.selected_session_id}`)
-      if (response.ok) {
-        const data = await response.json()
-        const leads = data.leads || []
-        const newLeads: AddedLead[] = []
-        leads.forEach((lead: any) => {
-          const company = lead.company?.name || ''
-          const jobOpening = lead.job_opening || ''
-          const pocs = lead.pocs || []
-          pocs.forEach((poc: any, idx: number) => {
-            if (poc.email) {
-              newLeads.push({
-                id: `le-${lead.id || Date.now()}-${idx}`,
-                name: poc.name || '',
-                email: poc.email,
-                company,
-                title: poc.title || '',
-                jobTitle: jobOpening,
-                source: 'lead-engine'
-              })
-            }
+      const allLeads: AddedLead[] = []
+      for (const sessionId of selectedSessionIds) {
+        const response = await fetch(`/api/sessions/${sessionId}`)
+        if (response.ok) {
+          const data = await response.json()
+          const leads = data.leads || []
+          leads.forEach((lead: any) => {
+            const company = lead.company?.name || ''
+            const jobOpening = lead.job_opening || ''
+            const pocs = lead.pocs || []
+            pocs.forEach((poc: any, idx: number) => {
+              if (poc.email) {
+                allLeads.push({
+                  id: `le-${lead.id || Date.now()}-${idx}`,
+                  name: poc.name || '',
+                  email: poc.email,
+                  company,
+                  title: poc.title || '',
+                  jobTitle: jobOpening,
+                  source: 'lead-engine'
+                })
+              }
+            })
           })
-        })
-        setAddedLeads(prev => {
-          const existingEmails = new Set(prev.map(l => l.email.toLowerCase()))
-          const deduped = newLeads.filter(l => !existingEmails.has(l.email.toLowerCase()))
-          return [...prev, ...deduped]
-        })
+        }
       }
+      setDrawerLeads(allLeads)
+      setSelectedLeadIds(new Set())
+      setDrawerStep('leads')
     } catch (error) {
-      console.error('Error importing session leads:', error)
+      console.error('Error loading session leads:', error)
     } finally {
-      setImportingSession(false)
+      setLoadingDrawerLeads(false)
+    }
+  }
+
+  const handleSaveAndNextLeads = () => {
+    const leadsToImport = drawerLeads.filter(l => selectedLeadIds.has(l.id))
+    setAddedLeads(prev => {
+      const existingEmails = new Set(prev.map(l => l.email.toLowerCase()))
+      const deduped = leadsToImport.filter(l => !existingEmails.has(l.email.toLowerCase()))
+      return [...prev, ...deduped]
+    })
+    setShowLeadEngineDrawer(false)
+    setSelectedSessionIds(new Set())
+    setDrawerStep('sessions')
+    setDrawerLeads([])
+    setSelectedLeadIds(new Set())
+  }
+
+  const toggleSessionSelection = (sessionId: number) => {
+    setSelectedSessionIds(prev => {
+      const next = new Set(prev)
+      if (next.has(sessionId)) {
+        next.delete(sessionId)
+      } else {
+        next.add(sessionId)
+      }
+      return next
+    })
+  }
+
+  const toggleLeadSelection = (leadId: string) => {
+    setSelectedLeadIds(prev => {
+      const next = new Set(prev)
+      if (next.has(leadId)) {
+        next.delete(leadId)
+      } else {
+        next.add(leadId)
+      }
+      return next
+    })
+  }
+
+  const toggleSelectAllLeads = () => {
+    if (selectedLeadIds.size === drawerLeads.length) {
+      setSelectedLeadIds(new Set())
+    } else {
+      setSelectedLeadIds(new Set(drawerLeads.map(l => l.id)))
     }
   }
 
@@ -380,7 +432,7 @@ export default function CampaignBuilderPage() {
                 </div>
 
                 {/* Lead Engine Import Card */}
-                <div className="lead-option-card">
+                <div className="lead-option-card" onClick={() => setShowLeadEngineDrawer(true)}>
                   <div className="lead-option-icon purple">
                     <i className="fas fa-cog"></i>
                   </div>
@@ -388,39 +440,13 @@ export default function CampaignBuilderPage() {
                   <p className="lead-option-desc">
                     Select a session from Lead Engine to import leads directly.
                   </p>
-                  {loadingSessions ? (
-                    <div className="loading-text">Loading sessions...</div>
-                  ) : sessions.length > 0 ? (
-                    <>
-                      <select
-                        className="session-select"
-                        value={formData.selected_session_id || ''}
-                        onChange={(e) => setFormData(prev => ({
-                          ...prev,
-                          selected_session_id: e.target.value ? parseInt(e.target.value) : null
-                        }))}
-                      >
-                        <option value="">Select a session...</option>
-                        {sessions.map(session => (
-                          <option key={session.id} value={session.id}>
-                            {session.name} ({session.total_leads} leads)
-                          </option>
-                        ))}
-                      </select>
-                      {formData.selected_session_id && (
-                        <button
-                          className="lead-option-import-btn"
-                          onClick={handleImportSession}
-                          disabled={importingSession}
-                        >
-                          <i className={importingSession ? 'fas fa-spinner fa-spin' : 'fas fa-download'}></i>
-                          {importingSession ? 'Importing...' : 'Import Leads'}
-                        </button>
-                      )}
-                    </>
-                  ) : (
-                    <p className="no-data-text">No sessions available. Generate leads first.</p>
-                  )}
+                  <button
+                    className="lead-option-import-btn"
+                    onClick={(e) => { e.stopPropagation(); setShowLeadEngineDrawer(true) }}
+                  >
+                    <i className="fas fa-download"></i>
+                    Import from Lead Engine
+                  </button>
                 </div>
 
                 {/* Manual Entry Card */}
@@ -838,6 +864,178 @@ export default function CampaignBuilderPage() {
           </div>
         </div>
       </div>
+
+      {/* Lead Engine Drawer */}
+      {showLeadEngineDrawer && (
+        <div className="le-drawer-overlay" onClick={() => { setShowLeadEngineDrawer(false); setDrawerStep('sessions') }}>
+          <div className="le-drawer" onClick={(e) => e.stopPropagation()}>
+            {/* Drawer Header */}
+            <div className="le-drawer-header">
+              <div className="le-drawer-header-left">
+                <i className="fas fa-pencil-alt le-drawer-edit-icon"></i>
+              </div>
+              <button className="le-drawer-close" onClick={() => { setShowLeadEngineDrawer(false); setDrawerStep('sessions') }}>
+                <i className="fas fa-times"></i>
+                Close
+              </button>
+            </div>
+
+            {/* === STEP 1: Session Selection === */}
+            {drawerStep === 'sessions' && (
+              <>
+                <div className="le-drawer-breadcrumb">
+                  <span className="le-drawer-breadcrumb-parent">Add leads</span>
+                  <i className="fas fa-chevron-right le-drawer-breadcrumb-sep"></i>
+                  <span className="le-drawer-breadcrumb-current">Lead Engine</span>
+                </div>
+
+                <div className="le-drawer-body">
+                  <h3 className="le-drawer-section-title">Saved Campaigns</h3>
+
+                  {loadingSessions ? (
+                    <div className="loading-text">Loading sessions...</div>
+                  ) : sessions.length > 0 ? (
+                    <div className="le-drawer-session-list">
+                      {sessions.map(session => (
+                        <label key={session.id} className={`le-drawer-session-item ${selectedSessionIds.has(session.id) ? 'selected' : ''}`}>
+                          <input
+                            type="checkbox"
+                            className="le-drawer-checkbox"
+                            checked={selectedSessionIds.has(session.id)}
+                            onChange={() => toggleSessionSelection(session.id)}
+                          />
+                          <div className="le-drawer-session-info">
+                            <span className="le-drawer-session-name">{session.name}</span>
+                            <span className="le-drawer-session-desc">Email campaign targeting companies in the US</span>
+                          </div>
+                          <div className="le-drawer-session-meta">
+                            <span className="le-drawer-session-leads">
+                              <i className="fas fa-users"></i>
+                              {session.total_leads} leads
+                            </span>
+                            <button
+                              className="le-drawer-view-btn"
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                window.open(`/session-manager?session=${session.id}`, '_blank')
+                              }}
+                            >
+                              View
+                            </button>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="no-data-text">No sessions available. Generate leads first.</p>
+                  )}
+                </div>
+
+                <div className="le-drawer-footer">
+                  <button className="le-drawer-back-btn" onClick={() => { setShowLeadEngineDrawer(false); setDrawerStep('sessions') }}>
+                    Back
+                  </button>
+                  <button
+                    className="le-drawer-next-btn"
+                    disabled={selectedSessionIds.size === 0 || loadingDrawerLeads}
+                    onClick={handleDrawerNextToLeads}
+                  >
+                    {loadingDrawerLeads ? 'Loading...' : 'Next'}
+                  </button>
+                </div>
+              </>
+            )}
+
+            {/* === STEP 2: Leads Table === */}
+            {drawerStep === 'leads' && (
+              <>
+                <div className="le-drawer-breadcrumb">
+                  <span className="le-drawer-breadcrumb-parent">Add leads</span>
+                  <i className="fas fa-chevron-right le-drawer-breadcrumb-sep"></i>
+                  <span className="le-drawer-breadcrumb-parent">Lead Engine</span>
+                  <i className="fas fa-chevron-right le-drawer-breadcrumb-sep"></i>
+                  <span className="le-drawer-breadcrumb-current">Leads</span>
+                </div>
+
+                <div className="le-drawer-body">
+                  <div className="le-drawer-leads-header">
+                    <h3 className="le-drawer-section-title">Leads</h3>
+                    <label className="le-drawer-select-all">
+                      <input
+                        type="checkbox"
+                        checked={drawerLeads.length > 0 && selectedLeadIds.size === drawerLeads.length}
+                        onChange={toggleSelectAllLeads}
+                      />
+                      Select All
+                    </label>
+                  </div>
+
+                  {loadingDrawerLeads ? (
+                    <div className="loading-text">Loading leads...</div>
+                  ) : drawerLeads.length > 0 ? (
+                    <>
+                      <div className="le-drawer-leads-table-wrap">
+                        <table className="le-drawer-leads-table">
+                          <thead>
+                            <tr>
+                              <th style={{ width: '40px' }}></th>
+                              <th>Name</th>
+                              <th>Company</th>
+                              <th>Title</th>
+                              <th>Email</th>
+                              <th style={{ width: '50px' }}>Action</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {drawerLeads.map(lead => (
+                              <tr key={lead.id} className={selectedLeadIds.has(lead.id) ? 'selected' : ''}>
+                                <td>
+                                  <input
+                                    type="checkbox"
+                                    className="le-drawer-checkbox"
+                                    checked={selectedLeadIds.has(lead.id)}
+                                    onChange={() => toggleLeadSelection(lead.id)}
+                                  />
+                                </td>
+                                <td>{lead.name || '—'}</td>
+                                <td>{lead.company || '—'}</td>
+                                <td>{lead.title || lead.jobTitle || '—'}</td>
+                                <td>{lead.email}</td>
+                                <td>
+                                  <i className="fas fa-pen le-drawer-action-icon"></i>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      <button className="le-drawer-add-leads-btn">
+                        <i className="fas fa-plus"></i> Add leads
+                      </button>
+                    </>
+                  ) : (
+                    <p className="no-data-text">No leads found in selected session(s).</p>
+                  )}
+                </div>
+
+                <div className="le-drawer-footer">
+                  <button className="le-drawer-back-btn" onClick={() => setDrawerStep('sessions')}>
+                    Back
+                  </button>
+                  <button
+                    className="le-drawer-next-btn"
+                    disabled={selectedLeadIds.size === 0}
+                    onClick={handleSaveAndNextLeads}
+                  >
+                    Save and Next
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </MainLayout>
   )
 }
