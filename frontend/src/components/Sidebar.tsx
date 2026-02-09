@@ -70,7 +70,7 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
           <div className="nav-item">
             <Link
               href="/campaign-manager"
-              className={`nav-link nav-group-header ${isGroupActive(['/campaign-manager']) ? 'group-active' : ''}`}
+              className={`nav-link nav-group-header ${isActive('/campaign-manager') ? 'active' : isGroupActive(['/campaign-manager']) ? 'group-active' : ''}`}
               onClick={(e) => {
                 if (!expandedGroups.has('campaign-manager')) {
                   toggleGroup('campaign-manager')
