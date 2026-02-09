@@ -99,6 +99,14 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
           )}
         </div>
 
+        {/* Sender Profile */}
+        <div className="nav-item">
+          <Link href="/sender-profile" className={`nav-link ${isActive('/sender-profile') ? 'active' : ''}`}>
+            <i className="fas fa-user-circle nav-icon"></i>
+            {!collapsed && <span>Sender Profile</span>}
+          </Link>
+        </div>
+
         {/* Response Manager */}
         <div className="nav-item">
           <Link href="/response-manager" className={`nav-link ${isActive('/response-manager') ? 'active' : ''}`}>

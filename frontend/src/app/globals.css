@@ -3084,7 +3084,7 @@ button {
 }
 
 .results-table td {
-  padding: 14px 18px;
+  padding: 14px 14px;
   font-size: 14px;
   color: #475569;
   border-bottom: 1px solid var(--hover-bg);
@@ -3998,5 +3998,383 @@ button {
 
   .toast-notification.show {
     transform: translateY(0);
+  }
+}
+
+/* ==========================================
+   SENDER PROFILE PAGE
+   ========================================== */
+
+/* Connect Email Card */
+.sender-connect-card {
+  background: var(--bg-white);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+.sender-connect-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--title-color);
+  margin: 0 0 20px 0;
+}
+
+.sender-connect-body {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.sender-connect-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--primary-blue);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.sender-connect-heading {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--title-color);
+  margin: 0 0 2px 0;
+}
+
+.sender-connect-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.sender-connect-actions {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.sender-smtp-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.sender-smtp-link:hover {
+  color: var(--primary-blue);
+}
+
+.sender-smtp-link i {
+  font-size: 11px;
+}
+
+/* Existing Senders Section */
+.sender-section {
+  background: var(--bg-white);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+.sender-section-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--title-color);
+  margin: 0 0 16px 0;
+}
+
+.sender-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.sender-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.sender-row:last-child {
+  border-bottom: none;
+}
+
+.sender-row-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1;
+}
+
+.sender-email-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--primary-blue);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.sender-row-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sender-email-address {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--title-color);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sender-label-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sender-profile-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.sender-default-badge {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--primary-blue);
+}
+
+.sender-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 12px;
+  border-radius: 20px;
+  white-space: nowrap;
+  margin-left: 12px;
+}
+
+.sender-status.connected {
+  background: #DCFCE7;
+  color: #16A34A;
+}
+
+.sender-status.expired {
+  background: #FEF3C7;
+  color: #D97706;
+}
+
+.sender-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.sender-status.connected .sender-status-dot {
+  background: #22C55E;
+}
+
+.sender-status.expired .sender-status-dot {
+  background: #F59E0B;
+}
+
+.sender-row-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.sender-reconnect-btn {
+  padding: 6px 16px !important;
+  font-size: 13px !important;
+}
+
+.sender-menu-wrapper {
+  position: relative;
+}
+
+.sender-dropdown-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 50;
+  background: var(--bg-white);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 6px 0;
+  min-width: 160px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  animation: senderMenuFadeIn 0.15s ease;
+}
+
+@keyframes senderMenuFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.sender-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 16px;
+  background: none;
+  border: none;
+  font-size: 13px;
+  font-weight: 500;
+  color: #475569;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.sender-dropdown-item:hover {
+  background: var(--hover-bg);
+  color: var(--title-color);
+}
+
+.sender-dropdown-item i {
+  width: 16px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--icon-color);
+}
+
+/* Add New Sender Link */
+.sender-add-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  margin-top: 16px;
+  background: none;
+  border: none;
+  color: var(--primary-blue);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.sender-add-link:hover {
+  color: #2563EB;
+}
+
+.sender-add-link i {
+  font-size: 12px;
+}
+
+/* Sender Stats Grid (3 columns) */
+.sender-stats-grid {
+  grid-template-columns: repeat(3, 1fr) !important;
+  margin-bottom: 20px;
+}
+
+/* Security Note */
+.sender-security-note {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 20px;
+  background: var(--bg-white);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.sender-security-note i {
+  color: var(--primary-blue);
+  font-size: 15px;
+  flex-shrink: 0;
+}
+
+.sender-security-note span {
+  flex: 1;
+}
+
+.sender-test-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: var(--primary-blue);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease;
+}
+
+.sender-test-btn:hover {
+  background: #2563EB;
+}
+
+/* Responsive Sender Profile */
+@media (max-width: 900px) {
+  .sender-stats-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .sender-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .sender-row-right {
+    align-self: flex-end;
+  }
+
+  .sender-connect-actions {
+    flex-direction: column;
+  }
+
+  .sender-security-note {
+    flex-direction: column;
+    text-align: center;
+    gap: 8px;
   }
 }
