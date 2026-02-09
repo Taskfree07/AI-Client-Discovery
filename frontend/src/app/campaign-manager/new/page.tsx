@@ -35,6 +35,15 @@ interface ValidatedLead extends AddedLead {
   isFlagged: boolean
 }
 
+interface Sender {
+  id: number
+  email: string
+  label: string
+  status: 'connected' | 'expired'
+  provider: 'gmail' | 'outlook' | 'smtp'
+  isDefault: boolean
+}
+
 interface CampaignFormData {
   campaign_name: string
   selected_session_id: number | null
@@ -53,9 +62,17 @@ interface CampaignFormData {
 
 const STEPS = [
   { id: 1, name: 'Add Leads', key: 'leads' },
-  { id: 2, name: 'Create Campaign Mail', key: 'mail' },
-  { id: 3, name: 'Schedule', key: 'schedule' },
-  { id: 4, name: 'Review and launch', key: 'review' }
+  { id: 2, name: 'Sender Profile', key: 'sender' },
+  { id: 3, name: 'Create Campaign Mail', key: 'mail' },
+  { id: 4, name: 'Schedule', key: 'schedule' },
+  { id: 5, name: 'Review and launch', key: 'review' }
+]
+
+const MOCK_SENDERS: Sender[] = [
+  { id: 1, email: 'marketing@example.com', label: 'Marketing', status: 'connected', provider: 'gmail', isDefault: true },
+  { id: 2, email: 'sales@example.com', label: 'Sales Profile', status: 'connected', provider: 'outlook', isDefault: false },
+  { id: 3, email: 'hr@example.com', label: 'HR Outreach', status: 'expired', provider: 'gmail', isDefault: false },
+  { id: 4, email: 'outreach@example.com', label: 'Outreach', status: 'connected', provider: 'smtp', isDefault: false },
 ]
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
@@ -81,6 +98,8 @@ export default function CampaignBuilderPage() {
   const [loadingDrawerLeads, setLoadingDrawerLeads] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState<'flagged' | 'detected' | null>(null)
   const [editingLead, setEditingLead] = useState<ValidatedLead | null>(null)
+  const [senders, setSenders] = useState<Sender[]>(MOCK_SENDERS)
+  const [selectedSenderIds, setSelectedSenderIds] = useState<Set<number>>(new Set())
 
   const [formData, setFormData] = useState<CampaignFormData>({
     campaign_name: '',
@@ -135,7 +154,7 @@ export default function CampaignBuilderPage() {
   }
 
   const handleNext = () => {
-    if (currentStep < 4) {
+    if (currentStep < 5) {
       setCurrentStep(currentStep + 1)
     }
   }
@@ -178,6 +197,27 @@ export default function CampaignBuilderPage() {
       console.error('Error launching campaign:', error)
       alert('Error launching campaign')
     }
+  }
+
+  const toggleSenderSelection = (senderId: number) => {
+    setSelectedSenderIds(prev => {
+      const next = new Set(prev)
+      if (next.has(senderId)) {
+        next.delete(senderId)
+      } else {
+        next.add(senderId)
+      }
+      return next
+    })
+  }
+
+  const removeSender = (senderId: number) => {
+    setSenders(prev => prev.filter(s => s.id !== senderId))
+    setSelectedSenderIds(prev => {
+      const next = new Set(prev)
+      next.delete(senderId)
+      return next
+    })
   }
 
   const toggleDay = (day: string) => {
@@ -802,8 +842,79 @@ export default function CampaignBuilderPage() {
             </div>
           )}
 
-          {/* Step 2: Create Campaign Mail */}
+          {/* Step 2: Sender Profile */}
           {currentStep === 2 && (
+            <div className="step-panel">
+              <h2 className="step-title">Sender Profile</h2>
+              <p className="step-description">Select the email accounts to send this campaign from</p>
+
+              {senders.length > 0 ? (
+                <div className="sender-select-list">
+                  {senders.map(sender => (
+                    <div
+                      key={sender.id}
+                      className={`sender-select-card ${selectedSenderIds.has(sender.id) ? 'selected' : ''} ${sender.status === 'expired' ? 'expired' : ''}`}
+                    >
+                      <div className="sender-select-left" onClick={() => sender.status === 'connected' && toggleSenderSelection(sender.id)}>
+                        <input
+                          type="checkbox"
+                          className="le-drawer-checkbox"
+                          checked={selectedSenderIds.has(sender.id)}
+                          disabled={sender.status === 'expired'}
+                          onChange={() => toggleSenderSelection(sender.id)}
+                        />
+                        <div className="sender-select-icon">
+                          <i className={`fab fa-${sender.provider === 'gmail' ? 'google' : sender.provider === 'outlook' ? 'microsoft' : 'fas fa-server'}`}></i>
+                        </div>
+                        <div className="sender-select-info">
+                          <div className="sender-select-email">{sender.email}</div>
+                          <div className="sender-select-meta">
+                            <span className="sender-select-label">{sender.label}</span>
+                            {sender.isDefault && <span className="sender-default-badge">Default</span>}
+                            <span className={`sender-select-status ${sender.status}`}>
+                              <span className="sender-status-dot"></span>
+                              {sender.status === 'connected' ? 'Connected' : 'Expired'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        className="sender-select-delete"
+                        onClick={() => removeSender(sender.id)}
+                        title="Remove sender"
+                      >
+                        <i className="fas fa-trash-alt"></i>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="empty-state-card">
+                  <div className="empty-state-icon">
+                    <i className="fas fa-envelope"></i>
+                  </div>
+                  <h3 className="empty-state-title">No Sender Accounts</h3>
+                  <p className="empty-state-description">
+                    Add sender accounts in the Sender Profile section first.
+                  </p>
+                  <a href="/campaign-manager/sender-profile" className="btn-primary">
+                    <i className="fas fa-plus"></i>
+                    Go to Sender Profile
+                  </a>
+                </div>
+              )}
+
+              {selectedSenderIds.size > 0 && (
+                <div className="selected-info-box" style={{ marginTop: '16px' }}>
+                  <i className="fas fa-check-circle"></i>
+                  <span><strong>{selectedSenderIds.size}</strong> sender account{selectedSenderIds.size > 1 ? 's' : ''} selected</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Step 3: Create Campaign Mail */}
+          {currentStep === 3 && (
             <div className="step-panel">
               <h2 className="step-title">Create Campaign Mail</h2>
               <p className="step-description">Select an email template for your campaign</p>
@@ -861,8 +972,8 @@ export default function CampaignBuilderPage() {
             </div>
           )}
 
-          {/* Step 3: Schedule */}
-          {currentStep === 3 && (
+          {/* Step 4: Schedule */}
+          {currentStep === 4 && (
             <div className="step-panel">
               <h2 className="step-title">Schedule</h2>
 
@@ -980,8 +1091,8 @@ export default function CampaignBuilderPage() {
             </div>
           )}
 
-          {/* Step 4: Review and Launch */}
-          {currentStep === 4 && (
+          {/* Step 5: Review and Launch */}
+          {currentStep === 5 && (
             <div className="step-panel">
               <h2 className="step-title">Review and Launch</h2>
               <p className="step-description">Review your campaign settings before launching</p>
@@ -1025,6 +1136,23 @@ export default function CampaignBuilderPage() {
                       <span className="review-value"><span className="source-badge manual">Manual</span> {addedLeads.filter(l => l.source === 'manual').length}</span>
                     </div>
                   )}
+                </div>
+
+                <div className="review-card">
+                  <h3 className="review-card-title">
+                    <i className="fas fa-user-circle"></i>
+                    Sender Accounts
+                  </h3>
+                  <div className="review-item">
+                    <span className="review-label">Selected Senders:</span>
+                    <span className="review-value">{selectedSenderIds.size > 0 ? selectedSenderIds.size : 'None selected'}</span>
+                  </div>
+                  {senders.filter(s => selectedSenderIds.has(s.id)).map(s => (
+                    <div className="review-item" key={s.id}>
+                      <span className="review-label">{s.label}:</span>
+                      <span className="review-value">{s.email}</span>
+                    </div>
+                  ))}
                 </div>
 
                 <div className="review-card">
@@ -1091,12 +1219,12 @@ export default function CampaignBuilderPage() {
             </button>
           )}
           <div className="footer-right">
-            {currentStep < 4 ? (
+            {currentStep < 5 ? (
               <button
                 className="btn-primary"
                 onClick={handleNext}
-                disabled={currentStep === 1 && addedLeads.length === 0}
-                style={currentStep === 1 && addedLeads.length === 0 ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+                disabled={(currentStep === 1 && addedLeads.length === 0) || (currentStep === 2 && selectedSenderIds.size === 0)}
+                style={(currentStep === 1 && addedLeads.length === 0) || (currentStep === 2 && selectedSenderIds.size === 0) ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
               >
                 Save and Next
               </button>

@@ -4378,3 +4378,122 @@ button {
     gap: 8px;
   }
 }
+
+/* === Sender Select (Campaign Builder Step 2) === */
+.sender-select-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.sender-select-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border: 1.5px solid var(--border-color);
+  border-radius: 12px;
+  background: var(--bg-white);
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+
+.sender-select-card:hover {
+  border-color: var(--primary-blue);
+  background: rgba(59, 130, 246, 0.02);
+}
+
+.sender-select-card.selected {
+  border-color: var(--primary-blue);
+  background: rgba(59, 130, 246, 0.05);
+}
+
+.sender-select-card.expired {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.sender-select-card.expired:hover {
+  border-color: var(--border-color);
+  background: var(--bg-white);
+}
+
+.sender-select-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1;
+  min-width: 0;
+}
+
+.sender-select-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #f0f4ff 0%, #e8edff 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 16px;
+  color: var(--primary-blue);
+}
+
+.sender-select-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.sender-select-email {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--title-color);
+}
+
+.sender-select-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.sender-select-label {
+  color: var(--text-secondary);
+}
+
+.sender-select-status {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.sender-select-status.connected {
+  color: #10b981;
+}
+
+.sender-select-status.expired {
+  color: #f59e0b;
+}
+
+.sender-select-delete {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 8px;
+  transition: all 0.15s ease;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.sender-select-delete:hover {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.08);
+}
