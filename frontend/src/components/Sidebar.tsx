@@ -68,9 +68,14 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
         {/* Campaign Manager Group */}
         <div className={`nav-group ${expandedGroups.has('campaign-manager') ? 'expanded' : ''}`}>
           <div className="nav-item">
-            <div 
-              className={`nav-link nav-group-header ${isGroupActive(['/campaign-manager']) ? 'group-active' : ''}`} 
-              onClick={() => toggleGroup('campaign-manager')}
+            <Link
+              href="/campaign-manager"
+              className={`nav-link nav-group-header ${isGroupActive(['/campaign-manager']) ? 'group-active' : ''}`}
+              onClick={(e) => {
+                if (!expandedGroups.has('campaign-manager')) {
+                  toggleGroup('campaign-manager')
+                }
+              }}
             >
               <i className="fas fa-users nav-icon"></i>
               {!collapsed && (
@@ -81,13 +86,13 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
                   </span>
                 </>
               )}
-            </div>
+            </Link>
           </div>
           {!collapsed && (
             <div className={`nav-submenu ${expandedGroups.has('campaign-manager') ? 'show' : ''}`}>
               <div className="nav-item">
-                <Link href="/campaign-manager" className={`nav-link ${isActive('/campaign-manager') ? 'active' : ''}`}>
-                  <span>Campaigns</span>
+                <Link href="/campaign-manager/sender-profile" className={`nav-link ${isActive('/campaign-manager/sender-profile') ? 'active' : ''}`}>
+                  <span>Sender Profile</span>
                 </Link>
               </div>
               <div className="nav-item">
@@ -97,14 +102,6 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
               </div>
             </div>
           )}
-        </div>
-
-        {/* Sender Profile */}
-        <div className="nav-item">
-          <Link href="/sender-profile" className={`nav-link ${isActive('/sender-profile') ? 'active' : ''}`}>
-            <i className="fas fa-user-circle nav-icon"></i>
-            {!collapsed && <span>Sender Profile</span>}
-          </Link>
         </div>
 
         {/* Response Manager */}
