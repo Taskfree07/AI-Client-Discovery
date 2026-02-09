@@ -13,6 +13,10 @@ class Config:
     GOOGLE_CX_CODE = os.getenv('GOOGLE_CX_CODE', '')
     APOLLO_API_KEY = os.getenv('APOLLO_API_KEY', '')
 
+    # Google OAuth (Gmail Sender)
+    GOOGLE_OAUTH_CLIENT_ID = os.getenv('GOOGLE_OAUTH_CLIENT_ID', '')
+    GOOGLE_OAUTH_CLIENT_SECRET = os.getenv('GOOGLE_OAUTH_CLIENT_SECRET', '')
+
     # Azure AD
     AZURE_CLIENT_ID = os.getenv('AZURE_CLIENT_ID', '')
     AZURE_CLIENT_SECRET = os.getenv('AZURE_CLIENT_SECRET', '')

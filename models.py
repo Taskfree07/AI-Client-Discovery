@@ -3,6 +3,32 @@ from datetime import datetime
 
 db = SQLAlchemy()
 
+class SenderAccount(db.Model):
+    """Connected email sender accounts via OAuth"""
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(200), unique=True, nullable=False)
+    label = db.Column(db.String(200), default='')
+    provider = db.Column(db.String(50), nullable=False)  # gmail, outlook, smtp
+    status = db.Column(db.String(50), default='connected')  # connected, expired
+    is_default = db.Column(db.Boolean, default=False)
+    access_token = db.Column(db.Text)
+    refresh_token = db.Column(db.Text)
+    token_expiry = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'email': self.email,
+            'label': self.label,
+            'provider': self.provider,
+            'status': self.status,
+            'isDefault': self.is_default,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
+
+
 class Settings(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     key = db.Column(db.String(100), unique=True, nullable=False)

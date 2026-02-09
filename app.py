@@ -1,7 +1,7 @@
-from flask import Flask, request, jsonify, session, Response, stream_with_context
+from flask import Flask, request, jsonify, session, Response, stream_with_context, redirect
 from flask_cors import CORS
 from config import Config
-from models import db, Settings, Campaign, EmailTemplate, JobLead, ActivityLog, LeadSession, SessionLead
+from models import db, Settings, Campaign, EmailTemplate, JobLead, ActivityLog, LeadSession, SessionLead, SenderAccount
 from services.google_search import GoogleSearchService
 from services.apollo_api import ApolloAPIService
 from services.email_generator import EmailGenerator
@@ -15,9 +15,13 @@ from urllib.parse import urlparse
 import os
 import json
 
+# Allow OAuth over HTTP for local development
+os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+
 app = Flask(__name__)
 app.config.from_object(Config)
-CORS(app)
+app.secret_key = app.config.get('SECRET_KEY', 'dev-secret-key-change-in-production')
+CORS(app, supports_credentials=True)
 
 # Initialize database
 db.init_app(app)
@@ -1800,6 +1804,164 @@ def lead_engine_generate():
             yield json.dumps({'type': 'error', 'message': str(e)}) + '\n'
 
     return Response(stream_with_context(generate()), mimetype='application/x-ndjson')
+
+
+# ==================== SENDER ACCOUNT ROUTES ====================
+
+@app.route('/api/senders', methods=['GET'])
+def get_senders():
+    """Get all sender accounts"""
+    senders = SenderAccount.query.order_by(SenderAccount.created_at.desc()).all()
+    return jsonify([s.to_dict() for s in senders])
+
+
+@app.route('/api/senders/<int:sender_id>', methods=['DELETE'])
+def delete_sender(sender_id):
+    """Delete a sender account"""
+    sender = SenderAccount.query.get(sender_id)
+    if not sender:
+        return jsonify({'error': 'Sender not found'}), 404
+    db.session.delete(sender)
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+@app.route('/api/senders/<int:sender_id>/default', methods=['PUT'])
+def set_default_sender(sender_id):
+    """Set a sender as default"""
+    SenderAccount.query.update({SenderAccount.is_default: False})
+    sender = SenderAccount.query.get(sender_id)
+    if not sender:
+        return jsonify({'error': 'Sender not found'}), 404
+    sender.is_default = True
+    db.session.commit()
+    return jsonify({'success': True, 'sender': sender.to_dict()})
+
+
+@app.route('/api/senders/<int:sender_id>', methods=['PUT'])
+def update_sender(sender_id):
+    """Update sender label"""
+    sender = SenderAccount.query.get(sender_id)
+    if not sender:
+        return jsonify({'error': 'Sender not found'}), 404
+    data = request.json
+    if 'label' in data:
+        sender.label = data['label']
+    db.session.commit()
+    return jsonify({'success': True, 'sender': sender.to_dict()})
+
+
+# ==================== GMAIL OAUTH ROUTES ====================
+
+@app.route('/api/auth/gmail/start')
+def gmail_oauth_start():
+    """Start Gmail OAuth flow"""
+    from google_auth_oauthlib.flow import Flow
+
+    client_id = os.getenv('GOOGLE_OAUTH_CLIENT_ID')
+    client_secret = os.getenv('GOOGLE_OAUTH_CLIENT_SECRET')
+
+    if not client_id or not client_secret:
+        return jsonify({'error': 'Gmail OAuth not configured'}), 500
+
+    flow = Flow.from_client_config(
+        {
+            "web": {
+                "client_id": client_id,
+                "client_secret": client_secret,
+                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                "token_uri": "https://oauth2.googleapis.com/token",
+                "redirect_uris": ["http://localhost:5000/api/auth/gmail/callback"]
+            }
+        },
+        scopes=[
+            'https://www.googleapis.com/auth/gmail.send',
+            'https://www.googleapis.com/auth/userinfo.email',
+            'openid'
+        ]
+    )
+    flow.redirect_uri = 'http://localhost:5000/api/auth/gmail/callback'
+
+    authorization_url, state = flow.authorization_url(
+        access_type='offline',
+        include_granted_scopes='true',
+        prompt='consent'
+    )
+
+    session['oauth_state'] = state
+    return jsonify({'auth_url': authorization_url})
+
+
+@app.route('/api/auth/gmail/callback')
+def gmail_oauth_callback():
+    """Handle Gmail OAuth callback"""
+    from google_auth_oauthlib.flow import Flow
+    import google.auth.transport.requests
+    from google.oauth2.credentials import Credentials
+
+    client_id = os.getenv('GOOGLE_OAUTH_CLIENT_ID')
+    client_secret = os.getenv('GOOGLE_OAUTH_CLIENT_SECRET')
+
+    flow = Flow.from_client_config(
+        {
+            "web": {
+                "client_id": client_id,
+                "client_secret": client_secret,
+                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                "token_uri": "https://oauth2.googleapis.com/token",
+                "redirect_uris": ["http://localhost:5000/api/auth/gmail/callback"]
+            }
+        },
+        scopes=[
+            'https://www.googleapis.com/auth/gmail.send',
+            'https://www.googleapis.com/auth/userinfo.email',
+            'openid'
+        ]
+    )
+    flow.redirect_uri = 'http://localhost:5000/api/auth/gmail/callback'
+
+    try:
+        os.environ['OAUTHLIB_RELAX_TOKEN_SCOPE'] = '1'
+        flow.fetch_token(authorization_response=request.url)
+    except Exception as e:
+        return redirect('http://localhost:3000/campaign-manager/sender-profile?error=' + str(e))
+
+    credentials = flow.credentials
+
+    # Get user email from Google
+    import requests as req
+    userinfo_response = req.get(
+        'https://www.googleapis.com/oauth2/v2/userinfo',
+        headers={'Authorization': f'Bearer {credentials.token}'}
+    )
+    user_info = userinfo_response.json()
+    user_email = user_info.get('email', '')
+
+    if not user_email:
+        return redirect('http://localhost:3000/campaign-manager/sender-profile?error=Could+not+get+email')
+
+    # Save or update sender account
+    sender = SenderAccount.query.filter_by(email=user_email).first()
+    if sender:
+        sender.access_token = credentials.token
+        sender.refresh_token = credentials.refresh_token or sender.refresh_token
+        sender.token_expiry = credentials.expiry
+        sender.status = 'connected'
+    else:
+        sender = SenderAccount(
+            email=user_email,
+            label=user_email.split('@')[0].title(),
+            provider='gmail',
+            status='connected',
+            access_token=credentials.token,
+            refresh_token=credentials.refresh_token,
+            token_expiry=credentials.expiry
+        )
+        db.session.add(sender)
+
+    db.session.commit()
+
+    return redirect('http://localhost:3000/campaign-manager/sender-profile?success=true&email=' + user_email)
 
 
 # Initialize database and create default data

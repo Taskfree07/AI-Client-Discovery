@@ -98,7 +98,8 @@ export default function CampaignBuilderPage() {
   const [loadingDrawerLeads, setLoadingDrawerLeads] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState<'flagged' | 'detected' | null>(null)
   const [editingLead, setEditingLead] = useState<ValidatedLead | null>(null)
-  const [senders, setSenders] = useState<Sender[]>(MOCK_SENDERS)
+  const [senders, setSenders] = useState<Sender[]>([])
+  const [loadingSenders, setLoadingSenders] = useState(true)
   const [selectedSenderIds, setSelectedSenderIds] = useState<Set<number>>(new Set())
 
   const [formData, setFormData] = useState<CampaignFormData>({
@@ -119,6 +120,7 @@ export default function CampaignBuilderPage() {
   useEffect(() => {
     loadSessions()
     loadTemplates()
+    loadSenders()
   }, [])
 
   const loadSessions = async () => {
@@ -150,6 +152,28 @@ export default function CampaignBuilderPage() {
       console.error('Error loading templates:', error)
     } finally {
       setLoadingTemplates(false)
+    }
+  }
+
+  const loadSenders = async () => {
+    try {
+      const response = await fetch('/api/senders')
+      if (response.ok) {
+        const data = await response.json()
+        const apiSenders = Array.isArray(data) ? data : []
+        if (apiSenders.length > 0) {
+          setSenders(apiSenders)
+        } else {
+          setSenders(MOCK_SENDERS)
+        }
+      } else {
+        setSenders(MOCK_SENDERS)
+      }
+    } catch (error) {
+      console.error('Error loading senders:', error)
+      setSenders(MOCK_SENDERS)
+    } finally {
+      setLoadingSenders(false)
     }
   }
 
@@ -211,7 +235,12 @@ export default function CampaignBuilderPage() {
     })
   }
 
-  const removeSender = (senderId: number) => {
+  const removeSender = async (senderId: number) => {
+    try {
+      await fetch(`/api/senders/${senderId}`, { method: 'DELETE' })
+    } catch (e) {
+      // ignore - works for both API and mock
+    }
     setSenders(prev => prev.filter(s => s.id !== senderId))
     setSelectedSenderIds(prev => {
       const next = new Set(prev)
@@ -848,7 +877,12 @@ export default function CampaignBuilderPage() {
               <h2 className="step-title">Sender Profile</h2>
               <p className="step-description">Select the email accounts to send this campaign from</p>
 
-              {senders.length > 0 ? (
+              {loadingSenders ? (
+                <div className="loading-container">
+                  <div className="loading-spinner"></div>
+                  <p>Loading sender accounts...</p>
+                </div>
+              ) : senders.length > 0 ? (
                 <div className="sender-select-list">
                   {senders.map(sender => (
                     <div
