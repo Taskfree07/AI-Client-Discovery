@@ -92,7 +92,7 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
             <div className={`nav-submenu ${expandedGroups.has('campaign-manager') ? 'show' : ''}`}>
               <div className="nav-item">
                 <Link href="/campaign-manager/sender-profile" className={`nav-link ${isActive('/campaign-manager/sender-profile') ? 'active' : ''}`}>
-                  <span>Sender Profile</span>
+                  <span>Sender </span>
                 </Link>
               </div>
               <div className="nav-item">

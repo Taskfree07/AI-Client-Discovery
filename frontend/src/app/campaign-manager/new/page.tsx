@@ -62,7 +62,7 @@ interface CampaignFormData {
 
 const STEPS = [
   { id: 1, name: 'Add Leads', key: 'leads' },
-  { id: 2, name: 'Sender Profile', key: 'sender' },
+  { id: 2, name: 'Sender Identity', key: 'sender' },
   { id: 3, name: 'Create Campaign Mail', key: 'mail' },
   { id: 4, name: 'Schedule', key: 'schedule' },
   { id: 5, name: 'Review and launch', key: 'review' }
@@ -871,10 +871,10 @@ export default function CampaignBuilderPage() {
             </div>
           )}
 
-          {/* Step 2: Sender Profile */}
+          {/* Step 2: Sender Identity */}
           {currentStep === 2 && (
             <div className="step-panel">
-              <h2 className="step-title">Sender Profile</h2>
+              <h2 className="step-title">Sender Identity</h2>
               <p className="step-description">Select the email accounts to send this campaign from</p>
 
               {loadingSenders ? (
@@ -929,11 +929,11 @@ export default function CampaignBuilderPage() {
                   </div>
                   <h3 className="empty-state-title">No Sender Accounts</h3>
                   <p className="empty-state-description">
-                    Add sender accounts in the Sender Profile section first.
+                    Add sender accounts in the Sender Identity section first.
                   </p>
                   <a href="/campaign-manager/sender-profile" className="btn-primary">
                     <i className="fas fa-plus"></i>
-                    Go to Sender Profile
+                    Go to Sender Identity
                   </a>
                 </div>
               )}
