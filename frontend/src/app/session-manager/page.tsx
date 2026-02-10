@@ -21,6 +21,7 @@ interface FormData {
   locations: string[]
   industries: string[]
   companySizes: string[]
+  pocRoles: string[]
 }
 
 interface Lead {
@@ -56,7 +57,8 @@ export default function SessionManagerPage() {
     targetLeadCount: 50,
     locations: [],
     industries: [],
-    companySizes: ['small']
+    companySizes: ['small'],
+    pocRoles: []
   })
   const [jobTitleInput, setJobTitleInput] = useState('')
   const [locationInput, setLocationInput] = useState('')
@@ -185,7 +187,8 @@ export default function SessionManagerPage() {
       targetLeadCount: 50,
       locations: [],
       industries: [],
-      companySizes: ['small']
+      companySizes: ['small'],
+      pocRoles: []
     })
     setJobTitleInput('')
     setLocationInput('')
@@ -220,6 +223,15 @@ export default function SessionManagerPage() {
       companySizes: prev.companySizes.includes(size)
         ? prev.companySizes.filter(s => s !== size)
         : [...prev.companySizes, size]
+    }))
+  }
+
+  const togglePocRole = (role: string) => {
+    setFormData(prev => ({
+      ...prev,
+      pocRoles: prev.pocRoles.includes(role)
+        ? prev.pocRoles.filter(r => r !== role)
+        : [...prev.pocRoles, role]
     }))
   }
 
@@ -270,7 +282,8 @@ export default function SessionManagerPage() {
           locations: formData.locations.length > 0 ? formData.locations : null,
           industries: formData.industries.length > 0 ? formData.industries : null,
           keywords: null,
-          company_sizes: formData.companySizes.length > 0 ? formData.companySizes : null
+          company_sizes: formData.companySizes.length > 0 ? formData.companySizes : null,
+          poc_roles: formData.pocRoles.length > 0 ? formData.pocRoles : null
         })
       })
 
@@ -845,6 +858,72 @@ export default function SessionManagerPage() {
                   <span>Large (500+)</span>
                 </label>
               </div>
+            </div>
+          </div>
+
+          {/* POC Role Filter */}
+          <div className="panel-field" style={{ marginTop: '8px' }}>
+            <label className="panel-label">POC Role Filter</label>
+            <span className="panel-helper" style={{ marginBottom: '8px', display: 'block' }}>
+              Leave empty to use default ranking. Select roles to restrict results.
+            </span>
+            <div className="panel-checkboxes" style={{ flexDirection: 'column', gap: '6px' }}>
+              <label className="panel-checkbox">
+                <input
+                  type="checkbox"
+                  checked={formData.pocRoles.includes('talent_acquisition')}
+                  onChange={() => togglePocRole('talent_acquisition')}
+                />
+                <span>Talent Acquisition / Head of Talent</span>
+              </label>
+              <label className="panel-checkbox">
+                <input
+                  type="checkbox"
+                  checked={formData.pocRoles.includes('hr_manager')}
+                  onChange={() => togglePocRole('hr_manager')}
+                />
+                <span>HR Manager / HR Business Partner</span>
+              </label>
+              <label className="panel-checkbox">
+                <input
+                  type="checkbox"
+                  checked={formData.pocRoles.includes('engineering_manager')}
+                  onChange={() => togglePocRole('engineering_manager')}
+                />
+                <span>Engineering Manager / Hiring Manager</span>
+              </label>
+              <label className="panel-checkbox">
+                <input
+                  type="checkbox"
+                  checked={formData.pocRoles.includes('vp_engineering')}
+                  onChange={() => togglePocRole('vp_engineering')}
+                />
+                <span>VP Engineering / VP IT</span>
+              </label>
+              <label className="panel-checkbox">
+                <input
+                  type="checkbox"
+                  checked={formData.pocRoles.includes('cto')}
+                  onChange={() => togglePocRole('cto')}
+                />
+                <span>CTO / Technical Director</span>
+              </label>
+              <label className="panel-checkbox">
+                <input
+                  type="checkbox"
+                  checked={formData.pocRoles.includes('senior_recruiter')}
+                  onChange={() => togglePocRole('senior_recruiter')}
+                />
+                <span>Senior Recruiter</span>
+              </label>
+              <label className="panel-checkbox">
+                <input
+                  type="checkbox"
+                  checked={formData.pocRoles.includes('others')}
+                  onChange={() => togglePocRole('others')}
+                />
+                <span>Others</span>
+              </label>
             </div>
           </div>
 

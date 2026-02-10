@@ -1668,6 +1668,7 @@ def lead_engine_generate():
             industries = data.get('industries')
             keywords = data.get('keywords')
             company_sizes = data.get('company_sizes')
+            poc_roles = data.get('poc_roles')
             session_id = data.get('session_id')  # Existing session ID
             session_title = data.get('session_title', 'Lead Search')
 
@@ -1730,6 +1731,7 @@ def lead_engine_generate():
                 industries=industries,
                 keywords=keywords,
                 company_sizes=company_sizes,
+                poc_roles=poc_roles,
                 session_title=session_title
             ):
                 # Save lead to session when we get a new lead
