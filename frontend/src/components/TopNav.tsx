@@ -1,16 +1,13 @@
 'use client'
 
-export default function TopNav({ onToggleSidebar }: { onToggleSidebar?: () => void }) {
+export default function TopNav() {
   return (
     <nav className="top-nav">
       <div className="top-nav-left">
-        <button className="sidebar-toggle" onClick={onToggleSidebar}>
-          <i className="fas fa-bars"></i>
-        </button>
         <div className="logo">
-          <img 
-            src="/logo.png" 
-            alt="Techgene Logo" 
+          <img
+            src="/logo.png"
+            alt="Techgene Logo"
             className="logo-image"
           />
         </div>
