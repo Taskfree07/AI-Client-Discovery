@@ -2,7 +2,7 @@
 
 import MainLayout from '@/components/MainLayout'
 import { useState, useEffect } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 
 interface Session {
   id: number
@@ -79,9 +79,8 @@ const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'
 
 export default function CampaignBuilderPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const campaignNameFromParam = searchParams.get('name') || ''
   const [currentStep, setCurrentStep] = useState(1)
+  const [campaignNameError, setCampaignNameError] = useState('')
   const [sessions, setSessions] = useState<Session[]>([])
   const [templates, setTemplates] = useState<Template[]>([])
   const [loadingSessions, setLoadingSessions] = useState(true)
@@ -108,7 +107,7 @@ export default function CampaignBuilderPage() {
   const [selectedSenderIds, setSelectedSenderIds] = useState<Set<number>>(new Set())
 
   const [formData, setFormData] = useState<CampaignFormData>({
-    campaign_name: campaignNameFromParam,
+    campaign_name: '',
     selected_session_id: null,
     selected_template_id: null,
     start_date: '',
@@ -183,6 +182,11 @@ export default function CampaignBuilderPage() {
   }
 
   const handleNext = () => {
+    if (!formData.campaign_name.trim()) {
+      setCampaignNameError('Campaign name is required')
+      return
+    }
+    setCampaignNameError('')
     if (currentStep < 5) {
       setCurrentStep(currentStep + 1)
     }
@@ -695,7 +699,7 @@ export default function CampaignBuilderPage() {
         {/* Header */}
         <div className="builder-header">
           <div className="builder-header-left">
-            <h1 className="page-title">{formData.campaign_name || 'Create Campaign'}</h1>
+            <h1 className="page-title">Create Campaign</h1>
             <p className="page-subtitle">Create and manage multi-channel outreach campaigns</p>
           </div>
           <div className="builder-header-right">
@@ -706,29 +710,49 @@ export default function CampaignBuilderPage() {
           </div>
         </div>
 
+        {/* Campaign Name Field */}
+        <div className="campaign-name-field">
+          <label className="campaign-name-label">
+            Campaign Name <span style={{ color: '#ef4444' }}>*</span>
+          </label>
+          <input
+            type="text"
+            className={`campaign-name-input ${campaignNameError ? 'input-error' : ''}`}
+            placeholder="Enter The Campaign Name Here"
+            value={formData.campaign_name}
+            onChange={(e) => {
+              setFormData(prev => ({ ...prev, campaign_name: e.target.value }))
+              if (campaignNameError) setCampaignNameError('')
+            }}
+          />
+          {campaignNameError && (
+            <span className="campaign-name-error">{campaignNameError}</span>
+          )}
+        </div>
+
         {/* Steps Progress */}
         <div className="steps-container">
-          <div className="steps-header">
-            {STEPS.map((step, index) => (
-              <div 
-                key={step.id} 
-                className={`step-item ${currentStep >= step.id ? 'active' : ''} ${currentStep === step.id ? 'current' : ''}`}
+          <div className="steps-labels">
+            {STEPS.map((step) => (
+              <div
+                key={step.id}
+                className={`step-label-item ${currentStep >= step.id ? 'active' : ''} ${currentStep === step.id ? 'current' : ''}`}
                 onClick={() => setCurrentStep(step.id)}
               >
                 <span className="step-name">{step.name}</span>
               </div>
             ))}
           </div>
-          <div className="steps-progress-bar">
-            <div 
-              className="steps-progress-fill" 
-              style={{ width: `${((currentStep - 1) / (STEPS.length - 1)) * 100}%` }}
+          <div className="steps-dots-row">
+            <div className="steps-track-bg"></div>
+            <div
+              className="steps-track-fill"
+              style={{ width: `${((currentStep - 1) / (STEPS.length - 1)) * 80}%` }}
             ></div>
-            {STEPS.map((step, index) => (
-              <div 
+            {STEPS.map((step) => (
+              <div
                 key={step.id}
                 className={`step-dot ${currentStep >= step.id ? 'active' : ''}`}
-                style={{ left: `${(index / (STEPS.length - 1)) * 100}%` }}
               ></div>
             ))}
           </div>
