@@ -1040,10 +1040,10 @@ def pipeline_contact():
     })
 
     # SECURITY: Apollo API disabled - use Session Manager instead
-    """
+    # """
     # Commented out code - Apollo API disabled for pipeline
     # Use Session Manager for lead search functionality
-    """
+    # """
 
 @app.route('/api/pipeline/reveal-email', methods=['POST'])
 def pipeline_reveal_email():
@@ -1054,7 +1054,7 @@ def pipeline_reveal_email():
     })
 
     # SECURITY: Apollo API disabled - use Session Manager instead
-    """
+    # """
     try:
         data = request.json
         person_id = data.get('person_id')
