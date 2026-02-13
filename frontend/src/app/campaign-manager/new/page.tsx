@@ -1,8 +1,8 @@
 'use client'
 
 import MainLayout from '@/components/MainLayout'
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import React, { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 interface Session {
   id: number
@@ -44,10 +44,21 @@ interface Sender {
   isDefault: boolean
 }
 
+interface SequenceStep {
+  step_number: number
+  template_id: number | null
+  template?: Template
+  days_after_previous: number
+}
+
 interface CampaignFormData {
   campaign_name: string
   selected_session_id: number | null
   selected_template_id: number | null
+  selected_sender_ids: number[]
+  // Email Sequence
+  email_sequence: SequenceStep[]
+  ai_personalization_enabled: boolean
   // Schedule
   start_date: string
   end_date: string
@@ -77,7 +88,7 @@ const MOCK_SENDERS: Sender[] = [
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
-export default function CampaignBuilderPage() {
+function CampaignBuilderPage() {
   const router = useRouter()
   const [currentStep, setCurrentStep] = useState(1)
   const [campaignNameError, setCampaignNameError] = useState('')
@@ -110,6 +121,14 @@ export default function CampaignBuilderPage() {
     campaign_name: '',
     selected_session_id: null,
     selected_template_id: null,
+    selected_sender_ids: [],
+    email_sequence: [
+      { step_number: 1, template_id: null, days_after_previous: 0 },
+      { step_number: 2, template_id: null, days_after_previous: 3 },
+      { step_number: 3, template_id: null, days_after_previous: 4 },
+      { step_number: 4, template_id: null, days_after_previous: 4 }
+    ],
+    ai_personalization_enabled: true,
     start_date: '',
     end_date: '',
     from_time: '09:10',
@@ -121,11 +140,64 @@ export default function CampaignBuilderPage() {
     interval_between_mails: 3
   })
 
+  // Wizard state - Dynamic email days
+  interface EmailDay {
+    id: string
+    dayNumber: number
+    stepOrder: number
+    template: Template | null
+  }
+
+  const [wizardStep, setWizardStep] = useState(1) // Dynamic based on emailDays length + 1 for review
+  const [emailDays, setEmailDays] = useState<EmailDay[]>([
+    { id: 'day-1', dayNumber: 1, stepOrder: 1, template: null } // Day 1 always present by default
+  ])
+  const [wizardPreviewTemplate, setWizardPreviewTemplate] = useState<Template | null>(null)
+
+  // Add Day Modal state
+  const [showAddDayModal, setShowAddDayModal] = useState(false)
+  const [newDayNumber, setNewDayNumber] = useState('')
+
+  // Modals
+  const [showImportModal, setShowImportModal] = useState(false)
+  const [showUploadModal, setShowUploadModal] = useState(false)
+  const [showTestEmailModal, setShowTestEmailModal] = useState(false)
+  const [testEmailAddress, setTestEmailAddress] = useState('')
+  const [selectedTestTemplate, setSelectedTestTemplate] = useState<Template | null>(null)
+  const [sendingTestEmail, setSendingTestEmail] = useState(false)
+  const [selectedTestSender, setSelectedTestSender] = useState<number | null>(null)
+
+  // AI Personalization - Dynamic
+  const [showPersonalizeModal, setShowPersonalizeModal] = useState(false)
+  const [personalizingEmail, setPersonalizingEmail] = useState(false)
+  const [personalizeTarget, setPersonalizeTarget] = useState<string | 'batch' | null>(null) // Using email day ID or 'batch'
+  const [personalizeResult, setPersonalizeResult] = useState<{
+    original: { subject: string; body: string }
+    personalized: { subject: string; body: string }
+    changes_made: string[]
+    analysis: { industries_detected?: string[]; titles_detected?: string[]; tone_adjustment?: string; pain_points_targeted?: string[] }
+  } | null>(null)
+  const [personalizeEditMode, setPersonalizeEditMode] = useState(false)
+  const [personalizeEditSubject, setPersonalizeEditSubject] = useState('')
+  const [personalizeEditBody, setPersonalizeEditBody] = useState('')
+  const [personalizedFlags, setPersonalizedFlags] = useState<Record<string, boolean>>({}) // Key = email day ID
+  const [batchPersonalizing, setBatchPersonalizing] = useState(false)
+  const [batchProgress, setBatchProgress] = useState(0)
+
   useEffect(() => {
     loadSessions()
     loadTemplates()
     loadSenders()
   }, [])
+
+  // ESC key handler for CSV drawer
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && showCsvDrawer) closeCsvDrawer()
+    }
+    document.addEventListener('keydown', handleEsc)
+    return () => document.removeEventListener('keydown', handleEsc)
+  }, [showCsvDrawer])
 
   const loadSessions = async () => {
     try {
@@ -182,12 +254,28 @@ export default function CampaignBuilderPage() {
   }
 
   const handleNext = () => {
+    // Campaign name validation
     if (!formData.campaign_name.trim()) {
       setCampaignNameError('Campaign name is required')
       return
     }
     setCampaignNameError('')
+
     if (currentStep < 5) {
+      // Step 3 validation: warn if no templates selected
+      if (currentStep === 3) {
+        const count = emailDays.filter(d => d.template).length
+        if (count === 0) {
+          alert('Please select at least one email template in the wizard before continuing.')
+          return
+        }
+        // Sync wizard data to formData
+        syncWizardToFormData()
+      }
+      // Step 2 sync: capture selected senders
+      if (currentStep === 2) {
+        setFormData(prev => ({ ...prev, selected_sender_ids: Array.from(selectedSenderIds) }))
+      }
       setCurrentStep(currentStep + 1)
     }
   }
@@ -200,10 +288,27 @@ export default function CampaignBuilderPage() {
 
   const handleSaveDraft = async () => {
     try {
+      const email_sequence = emailDays.map((emailDay, idx) => {
+        const previousDay = idx > 0 ? emailDays[idx - 1] : null
+        const daysAfter = previousDay ? emailDay.dayNumber - previousDay.dayNumber : 0
+
+        return {
+          step_number: emailDay.stepOrder,
+          template_id: emailDay.template?.id || null,
+          days_after_previous: daysAfter
+        }
+      })
+
+      const draftData = {
+        ...formData,
+        selected_sender_ids: Array.from(selectedSenderIds),
+        email_sequence,
+        status: 'draft'
+      }
       const response = await fetch('/api/campaigns', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...formData, status: 'draft' })
+        body: JSON.stringify(draftData)
       })
       if (response.ok) {
         alert('Campaign saved as draft!')
@@ -215,16 +320,410 @@ export default function CampaignBuilderPage() {
     }
   }
 
-  const handleLaunch = async () => {
+  // ===== WIZARD FUNCTIONS =====
+
+  // Wizard Navigation - Works with dynamic emailDays array
+  const getCurrentEmailDay = (): EmailDay | undefined => {
+    const reviewStep = emailDays.length + 1
+    if (wizardStep >= reviewStep) return undefined
+    return emailDays[wizardStep - 1]
+  }
+
+  const getCurrentDayNumber = () => {
+    const currentDay = getCurrentEmailDay()
+    return currentDay ? currentDay.dayNumber : 1
+  }
+
+  const handleWizardNext = () => {
+    const maxStep = emailDays.length + 1 // +1 for review step
+    if (wizardStep < maxStep) {
+      setWizardStep(wizardStep + 1)
+      // Auto-select preview if template already selected for next step
+      const nextDay = emailDays[wizardStep] // wizardStep is now incremented
+      if (nextDay?.template) {
+        setWizardPreviewTemplate(nextDay.template)
+      } else {
+        setWizardPreviewTemplate(null)
+      }
+    }
+  }
+
+  const handleWizardBack = () => {
+    if (wizardStep > 1) {
+      setWizardStep(wizardStep - 1)
+      const prevDay = emailDays[wizardStep - 2] // wizardStep is now decremented
+      if (prevDay?.template) {
+        setWizardPreviewTemplate(prevDay.template)
+      } else {
+        setWizardPreviewTemplate(null)
+      }
+    }
+  }
+
+  const handleTemplateSelect = (template: Template) => {
+    const currentDay = getCurrentEmailDay()
+    if (currentDay) {
+      setEmailDays(prev => prev.map(day =>
+        day.id === currentDay.id ? { ...day, template } : day
+      ))
+      setWizardPreviewTemplate(template)
+    }
+  }
+
+  const handleSkipEmail = () => {
+    const currentDay = getCurrentEmailDay()
+    if (currentDay) {
+      setEmailDays(prev => prev.map(day =>
+        day.id === currentDay.id ? { ...day, template: null } : day
+      ))
+      setWizardPreviewTemplate(null)
+    }
+    handleWizardNext()
+  }
+
+  // Add new email day
+  const handleAddDay = () => {
+    setShowAddDayModal(true)
+  }
+
+  const handleConfirmAddDay = () => {
+    const dayNum = parseInt(newDayNumber)
+    if (!dayNum || dayNum < 1) {
+      alert('Please enter a valid day number (1 or greater)')
+      return
+    }
+
+    const newDay: EmailDay = {
+      id: `day-${Date.now()}`,
+      dayNumber: dayNum,
+      stepOrder: emailDays.length + 1,
+      template: null
+    }
+
+    setEmailDays(prev => [...prev, newDay])
+    setNewDayNumber('')
+    setShowAddDayModal(false)
+  }
+
+  const handleCancelAddDay = () => {
+    setNewDayNumber('')
+    setShowAddDayModal(false)
+  }
+
+  // Delete email day (except Day 1)
+  const handleDeleteDay = (dayId: string) => {
+    const dayToDelete = emailDays.find(d => d.id === dayId)
+    if (dayToDelete?.dayNumber === 1) {
+      alert('Cannot delete Day 1')
+      return
+    }
+
+    setEmailDays(prev => {
+      const filtered = prev.filter(d => d.id !== dayId)
+      // Re-index stepOrder
+      return filtered.map((day, idx) => ({ ...day, stepOrder: idx + 1 }))
+    })
+
+    // Adjust wizardStep if needed
+    const deletedStepOrder = dayToDelete?.stepOrder || 0
+    if (wizardStep === deletedStepOrder) {
+      setWizardStep(Math.max(1, wizardStep - 1))
+    } else if (wizardStep > deletedStepOrder) {
+      setWizardStep(wizardStep - 1)
+    }
+  }
+
+  // Upload Template Handler
+  const handleUploadTemplate = () => {
+    setShowUploadModal(true)
+  }
+
+  const handleImportFromLibrary = () => {
+    setShowImportModal(true)
+  }
+
+  const handleImportSelect = (template: Template) => {
+    handleTemplateSelect(template)
+    setShowImportModal(false)
+  }
+
+  // Test Email handlers
+  const handleOpenTestEmail = (template: Template) => {
+    setSelectedTestTemplate(template)
+    setShowTestEmailModal(true)
+    setTestEmailAddress('')
+    // Auto-select first available sender or default sender
+    const defaultSender = senders.find(s => s.isDefault && s.status === 'connected')
+    const firstSender = senders.find(s => s.status === 'connected')
+    setSelectedTestSender(defaultSender?.id || firstSender?.id || null)
+  }
+
+  const handleSendTestEmail = async () => {
+    if (!testEmailAddress || !selectedTestTemplate) {
+      alert('Please enter a valid email address')
+      return
+    }
+
+    // Simple email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(testEmailAddress)) {
+      alert('Please enter a valid email address')
+      return
+    }
+
+    if (!selectedTestSender) {
+      alert('Please select a sender account')
+      return
+    }
+
+    setSendingTestEmail(true)
     try {
+      const response = await fetch('/api/campaigns/send-test-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipient_email: testEmailAddress,
+          // ALWAYS send current template content (includes personalized changes)
+          template_data: {
+            subject: selectedTestTemplate.subject_template,
+            body: selectedTestTemplate.body_template
+          },
+          sender_id: selectedTestSender,
+          test_lead_name: 'Test User',
+          test_company: 'Test Company'
+        })
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        alert(`✅ Test email sent successfully to ${testEmailAddress}!\n\nCheck your inbox in a few moments.`)
+        setShowTestEmailModal(false)
+        setTestEmailAddress('')
+        setSelectedTestSender(null)
+      } else {
+        alert(`❌ Failed to send test email: ${data.error || 'Unknown error'}\n\nPlease check your sender connection.`)
+      }
+    } catch (error: any) {
+      console.error('Error sending test email:', error)
+      alert(`❌ Failed to send test email: ${error.message || 'Unknown error'}`)
+    } finally {
+      setSendingTestEmail(false)
+    }
+  }
+
+  // AI Personalization handlers - Updated for dynamic emailDays
+  const handlePersonalize = async (emailDayId: string) => {
+    const emailDay = emailDays.find(d => d.id === emailDayId)
+    const template = emailDay?.template
+    if (!template) return
+    if (addedLeads.length === 0) {
+      alert('Add leads in Step 1 first to enable AI personalization')
+      return
+    }
+
+    setPersonalizeTarget(emailDayId)
+    setPersonalizingEmail(true)
+    setPersonalizeResult(null)
+    setPersonalizeEditMode(false)
+    setShowPersonalizeModal(true)
+
+    try {
+      const response = await fetch('/api/campaigns/personalize-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          subject: template.subject_template,
+          body: template.body_template,
+          leads: addedLeads.slice(0, 20).map(l => ({
+            name: l.name,
+            company: l.company,
+            title: l.title || l.jobTitle,
+            email: l.email
+          })),
+          mode: 'individual'
+        })
+      })
+
+      const data = await response.json()
+      if (response.ok && data.success) {
+        setPersonalizeResult(data)
+      } else {
+        alert(data.error || 'AI personalization failed')
+        setShowPersonalizeModal(false)
+      }
+    } catch (error: any) {
+      console.error('Personalization error:', error)
+      alert('Failed to connect to AI service')
+      setShowPersonalizeModal(false)
+    } finally {
+      setPersonalizingEmail(false)
+    }
+  }
+
+  const handleAcceptPersonalization = () => {
+    if (!personalizeResult || !personalizeTarget || personalizeTarget === 'batch') return
+
+    const personalized = personalizeEditMode
+      ? { subject: personalizeEditSubject, body: personalizeEditBody }
+      : personalizeResult.personalized
+
+    // Update the template in emailDays with personalized content
+    setEmailDays(prev => prev.map(day =>
+      day.id === personalizeTarget && day.template
+        ? {
+            ...day,
+            template: {
+              ...day.template,
+              subject_template: personalized.subject,
+              body_template: personalized.body
+            }
+          }
+        : day
+    ))
+
+    // Mark as personalized
+    setPersonalizedFlags(prev => ({ ...prev, [personalizeTarget]: true }))
+
+    // Update preview if this is the current wizard step's template
+    const currentDay = getCurrentEmailDay()
+    if (wizardPreviewTemplate && currentDay?.id === personalizeTarget) {
+      setWizardPreviewTemplate(prev => prev ? {
+        ...prev,
+        subject_template: personalized.subject,
+        body_template: personalized.body
+      } : null)
+    }
+
+    setShowPersonalizeModal(false)
+    setPersonalizeResult(null)
+  }
+
+  const handleBatchPersonalize = async () => {
+    if (addedLeads.length === 0) {
+      alert('Add leads in Step 1 first to enable AI personalization')
+      return
+    }
+
+    const toPersonalize = emailDays.filter(d => d.template && !personalizedFlags[d.id])
+
+    if (toPersonalize.length === 0) {
+      alert('All emails are already personalized or no templates selected')
+      return
+    }
+
+    setBatchPersonalizing(true)
+    setBatchProgress(0)
+
+    for (let i = 0; i < toPersonalize.length; i++) {
+      const emailDay = toPersonalize[i]
+      const template = emailDay.template!
+      setBatchProgress(Math.round(((i) / toPersonalize.length) * 100))
+
+      try {
+        const response = await fetch('/api/campaigns/personalize-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            subject: template.subject_template,
+            body: template.body_template,
+            leads: addedLeads.slice(0, 20).map(l => ({
+              name: l.name,
+              company: l.company,
+              title: l.title || l.jobTitle,
+              email: l.email
+            })),
+            mode: 'batch'
+          })
+        })
+
+        const data = await response.json()
+        if (response.ok && data.success) {
+          setEmailDays(prev => prev.map(day =>
+            day.id === emailDay.id && day.template
+              ? {
+                  ...day,
+                  template: {
+                    ...day.template,
+                    subject_template: data.personalized.subject,
+                    body_template: data.personalized.body
+                  }
+                }
+              : day
+          ))
+          setPersonalizedFlags(prev => ({ ...prev, [emailDay.id]: true }))
+        }
+      } catch (error) {
+        console.error(`Batch personalization failed for Email ${emailDay.stepOrder}:`, error)
+      }
+    }
+
+    setBatchProgress(100)
+    setBatchPersonalizing(false)
+    alert(`AI personalization complete! ${toPersonalize.length} email(s) updated.`)
+  }
+
+  // Sync wizard data into formData
+  const syncWizardToFormData = () => {
+    const updatedSequence = emailDays.map((emailDay, idx) => {
+      const previousDay = idx > 0 ? emailDays[idx - 1] : null
+      const daysAfter = previousDay ? emailDay.dayNumber - previousDay.dayNumber : 0
+
+      return {
+        step_number: emailDay.stepOrder,
+        template_id: emailDay.template?.id || null,
+        template: emailDay.template || undefined,
+        days_after_previous: daysAfter
+      }
+    })
+
+    setFormData(prev => ({ ...prev, email_sequence: updatedSequence }))
+  }
+
+  // ===== END WIZARD FUNCTIONS =====
+
+  const handleLaunch = async () => {
+    // Final sync before launch
+    syncWizardToFormData()
+    const emailCount = emailDays.filter(d => d.template).length
+    if (emailCount === 0) {
+      alert('Please configure at least one email in Step 3 before launching.')
+      return
+    }
+    if (selectedSenderIds.size === 0) {
+      alert('Please select at least one sender in Step 2 before launching.')
+      return
+    }
+
+    try {
+      const email_sequence = emailDays.map((emailDay, idx) => {
+        const previousDay = idx > 0 ? emailDays[idx - 1] : null
+        const daysAfter = previousDay ? emailDay.dayNumber - previousDay.dayNumber : 0
+
+        return {
+          step_number: emailDay.stepOrder,
+          template_id: emailDay.template?.id || null,
+          days_after_previous: daysAfter
+        }
+      })
+
+      const launchData = {
+        ...formData,
+        selected_sender_ids: Array.from(selectedSenderIds),
+        email_sequence,
+        status: 'active'
+      }
       const response = await fetch('/api/campaigns', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...formData, status: 'active' })
+        body: JSON.stringify(launchData)
       })
       if (response.ok) {
         alert('Campaign launched successfully!')
         router.push('/campaign-manager')
+      } else {
+        const data = await response.json()
+        alert(`Failed to launch: ${data.message || 'Unknown error'}`)
       }
     } catch (error) {
       console.error('Error launching campaign:', error)
@@ -440,15 +939,6 @@ export default function CampaignBuilderPage() {
     setUploadedCsvFiles([])
     setIsDragging(false)
   }
-
-  // ESC key handler for CSV drawer
-  useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && showCsvDrawer) closeCsvDrawer()
-    }
-    document.addEventListener('keydown', handleEsc)
-    return () => document.removeEventListener('keydown', handleEsc)
-  }, [showCsvDrawer])
 
   const handleAddLeadsFromSessions = async () => {
     if (selectedSessionIds.size === 0) return
@@ -690,9 +1180,6 @@ export default function CampaignBuilderPage() {
     setAddedLeads(prev => prev.filter(l => l.id !== id))
   }
 
-  const selectedSession = sessions.find(s => s.id === formData.selected_session_id)
-  const selectedTemplate = templates.find(t => t.id === formData.selected_template_id)
-
   return (
     <MainLayout>
       <div className="campaign-builder">
@@ -721,19 +1208,19 @@ export default function CampaignBuilderPage() {
             placeholder="Enter The Campaign Name Here"
             value={formData.campaign_name}
             onChange={(e) => {
-              setFormData(prev => ({ ...prev, campaign_name: e.target.value }))
+              setFormData({ ...formData, campaign_name: e.target.value })
               if (campaignNameError) setCampaignNameError('')
             }}
           />
           {campaignNameError && (
-            <span className="campaign-name-error">{campaignNameError}</span>
+            <div className="campaign-name-error">{campaignNameError}</div>
           )}
         </div>
 
         {/* Steps Progress */}
         <div className="steps-container">
           <div className="steps-labels">
-            {STEPS.map((step) => (
+            {STEPS.map((step, index) => (
               <div
                 key={step.id}
                 className={`step-label-item ${currentStep >= step.id ? 'active' : ''} ${currentStep === step.id ? 'current' : ''}`}
@@ -744,12 +1231,13 @@ export default function CampaignBuilderPage() {
             ))}
           </div>
           <div className="steps-dots-row">
-            <div className="steps-track-bg"></div>
-            <div
-              className="steps-track-fill"
-              style={{ width: `${((currentStep - 1) / (STEPS.length - 1)) * 80}%` }}
-            ></div>
-            {STEPS.map((step) => (
+            <div className="steps-track-bg">
+              <div
+                className="steps-track-fill"
+                style={{ width: `${((currentStep - 1) / (STEPS.length - 1)) * 80}%` }}
+              ></div>
+            </div>
+            {STEPS.map((step, index) => (
               <div
                 key={step.id}
                 className={`step-dot ${currentStep >= step.id ? 'active' : ''}`}
@@ -985,62 +1473,377 @@ export default function CampaignBuilderPage() {
             </div>
           )}
 
-          {/* Step 3: Create Campaign Mail */}
+          {/* Step 3: Create Campaign Mail - Wizard */}
           {currentStep === 3 && (
             <div className="step-panel">
               <h2 className="step-title">Create Campaign Mail</h2>
-              <p className="step-description">Select an email template for your campaign</p>
+              <p className="step-description">Build your email sequence step by step</p>
 
-              {loadingTemplates ? (
-                <div className="loading-container">
-                  <div className="loading-spinner"></div>
-                  <p>Loading templates...</p>
-                </div>
-              ) : templates.length > 0 ? (
-                <div className="templates-grid">
-                  {templates.map(template => (
-                    <div 
-                      key={template.id} 
-                      className={`template-select-card ${formData.selected_template_id === template.id ? 'selected' : ''}`}
-                      onClick={() => setFormData(prev => ({ ...prev, selected_template_id: template.id }))}
-                    >
-                      <div className="template-select-header">
-                        <h3 className="template-select-title">{template.name}</h3>
-                        {formData.selected_template_id === template.id && (
-                          <i className="fas fa-check-circle selected-icon"></i>
+              {/* Wizard Progress - Dynamic */}
+              <div className="wizard-progress">
+                {emailDays.map((emailDay, idx) => {
+                  const reviewStep = emailDays.length + 1
+                  const isReviewMode = wizardStep === reviewStep
+
+                  return (
+                    <React.Fragment key={emailDay.id}>
+                      {idx > 0 && <div className={`wizard-connector ${wizardStep > emailDay.stepOrder - 1 ? 'active' : ''}`}></div>}
+                      <div
+                        className={`wizard-step ${emailDay.template ? 'completed' : ''} ${wizardStep === emailDay.stepOrder ? 'active' : ''} ${isReviewMode ? 'review-mode' : ''}`}
+                        onClick={() => setWizardStep(emailDay.stepOrder)}
+                      >
+                        <div className="wizard-step-number">
+                          {emailDay.template ? <i className="fas fa-check"></i> : emailDay.stepOrder}
+                        </div>
+                        <div className="wizard-step-label">
+                          <span className="wizard-step-title">Day {emailDay.dayNumber}</span>
+                          <span className="wizard-step-subtitle">Email {emailDay.stepOrder}</span>
+                        </div>
+                        {/* Delete button for days other than Day 1 */}
+                        {emailDay.dayNumber !== 1 && (
+                          <button
+                            className="wizard-delete-btn"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleDeleteDay(emailDay.id)
+                            }}
+                            title="Delete this email day"
+                          >
+                            <i className="fas fa-times"></i>
+                          </button>
                         )}
                       </div>
-                      <div className="template-select-subject">
-                        <strong>Subject:</strong> {template.subject_template}
-                      </div>
-                      <div className="template-select-preview">
-                        {template.body_template ? template.body_template.substring(0, 100) : 'No preview available'}...
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="empty-state-card">
-                  <div className="empty-state-icon">
-                    <i className="fas fa-envelope"></i>
-                  </div>
-                  <h3 className="empty-state-title">No Templates Available</h3>
-                  <p className="empty-state-description">
-                    Create email templates first to use in your campaigns.
-                  </p>
-                  <a href="/campaign-manager/templates" className="btn-primary">
+                    </React.Fragment>
+                  )
+                })}
+
+                {/* Add Day Button */}
+                <div className={`wizard-connector ${wizardStep > emailDays.length ? 'active' : ''}`}></div>
+                <div
+                  className="wizard-step add-day-step"
+                  onClick={handleAddDay}
+                  title="Add new email day"
+                >
+                  <div className="wizard-step-number">
                     <i className="fas fa-plus"></i>
-                    Create Template
-                  </a>
+                  </div>
+                  <div className="wizard-step-label">
+                    <span className="wizard-step-title">Add Day</span>
+                  </div>
+                </div>
+
+                {/* Review Step */}
+                <div className={`wizard-connector ${wizardStep === emailDays.length + 1 ? 'active' : ''}`}></div>
+                <div
+                  className={`wizard-step ${wizardStep === emailDays.length + 1 ? 'active' : ''}`}
+                  onClick={() => setWizardStep(emailDays.length + 1)}
+                >
+                  <div className="wizard-step-number">
+                    <i className="fas fa-clipboard-check"></i>
+                  </div>
+                  <div className="wizard-step-label">
+                    <span className="wizard-step-title">Review</span>
+                    <span className="wizard-step-subtitle">Sequence</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Wizard Content: Email Days */}
+              {wizardStep <= emailDays.length && (
+                <div className="wizard-content">
+                  {/* Left Panel: Template Selection */}
+                  <div className="wizard-left-panel">
+                    <div className="wizard-panel-header">
+                      <h3>
+                        <i className="fas fa-envelope"></i>
+                        Email {getCurrentEmailDay()?.stepOrder || wizardStep}
+                      </h3>
+                      <p className="wizard-panel-desc">
+                        {getCurrentDayNumber() === 1 ? 'Sends immediately' : `Sends on day ${getCurrentDayNumber()}`}
+                      </p>
+                    </div>
+
+                    {loadingTemplates ? (
+                      <div className="loading-container">
+                        <div className="loading-spinner"></div>
+                        <p>Loading templates...</p>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="template-selection-list">
+                          {templates.length > 0 ? (
+                            templates.map(template => (
+                              <div
+                                key={template.id}
+                                className={`wz-template-card ${getCurrentEmailDay()?.template?.id === template.id ? 'selected' : ''}`}
+                                onClick={() => handleTemplateSelect(template)}
+                              >
+                                <div className="wz-template-radio">
+                                  <div className={`radio-dot ${getCurrentEmailDay()?.template?.id === template.id ? 'checked' : ''}`}></div>
+                                </div>
+                                <div className="wz-template-info">
+                                  <h4>{template.name}</h4>
+                                  <p className="wz-template-subject">
+                                    {template.subject_template}
+                                  </p>
+                                </div>
+                                <div className="wz-template-actions">
+                                  <button
+                                    className="btn-icon-small"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleOpenTestEmail(template)
+                                    }}
+                                    title="Send test email"
+                                  >
+                                    <i className="fas fa-paper-plane"></i>
+                                  </button>
+                                </div>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="wz-empty-templates">
+                              <i className="fas fa-inbox"></i>
+                              <p>No templates yet</p>
+                              <p className="wz-empty-hint">Import or upload templates below</p>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="wz-divider"><span>OR</span></div>
+
+                        <div className="wz-action-buttons">
+                          <button className="wz-action-btn" onClick={handleImportFromLibrary}>
+                            <i className="fas fa-file-import"></i>
+                            Import from Library
+                          </button>
+                          <button className="wz-action-btn" onClick={handleUploadTemplate}>
+                            <i className="fas fa-plus"></i>
+                            Upload New Template
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Right Panel: Live Preview */}
+                  <div className="wizard-right-panel">
+                    <div className="wizard-panel-header">
+                      <h3>
+                        <i className="fas fa-eye"></i>
+                        Live Preview
+                      </h3>
+                    </div>
+
+                    {wizardPreviewTemplate ? (
+                      <div className="wz-preview-content">
+                        <div className="wz-preview-email">
+                          <div className="wz-preview-header">
+                            <div className="wz-preview-field">
+                              <strong>From:</strong> {senders.find(s => s.isDefault)?.email || senders[0]?.email || 'sender@example.com'}
+                            </div>
+                            <div className="wz-preview-field">
+                              <strong>To:</strong> {addedLeads.length > 0 ? addedLeads[0].email : 'lead@example.com'}
+                            </div>
+                          </div>
+                          <div className="wz-preview-subject">
+                            {wizardPreviewTemplate.subject_template}
+                          </div>
+                          <div className="wz-preview-body">
+                            {wizardPreviewTemplate.body_template}
+                          </div>
+                        </div>
+
+                        <div className="wz-ai-box">
+                          <div className="wz-ai-header">
+                            <i className="fas fa-magic"></i>
+                            <h4>AI Personalization</h4>
+                            {getCurrentEmailDay() && personalizedFlags[getCurrentEmailDay()!.id] && (
+                              <span className="wz-ai-badge">Personalized</span>
+                            )}
+                          </div>
+                          <p className="wz-ai-desc">
+                            Tailor this email to match your {addedLeads.length || 0} leads
+                          </p>
+                          {addedLeads.length > 0 && (
+                            <div className="wz-ai-lead-summary">
+                              <div className="wz-ai-insight">
+                                <span className="wz-ai-label">Companies:</span>
+                                <span className="wz-ai-value">{[...new Set(addedLeads.slice(0, 5).map(l => l.company).filter(Boolean))].join(', ') || 'N/A'}</span>
+                              </div>
+                              <div className="wz-ai-insight">
+                                <span className="wz-ai-label">Titles:</span>
+                                <span className="wz-ai-value">{[...new Set(addedLeads.slice(0, 5).map(l => l.title || l.jobTitle).filter(Boolean))].join(', ') || 'N/A'}</span>
+                              </div>
+                            </div>
+                          )}
+                          <button
+                            className={`btn-personalize ${getCurrentEmailDay() && personalizedFlags[getCurrentEmailDay()!.id] ? 'done' : ''}`}
+                            disabled={addedLeads.length === 0 || personalizingEmail || !getCurrentEmailDay()}
+                            onClick={() => getCurrentEmailDay() && handlePersonalize(getCurrentEmailDay()!.id)}
+                          >
+                            <i className={getCurrentEmailDay() && personalizedFlags[getCurrentEmailDay()!.id] ? 'fas fa-redo' : 'fas fa-wand-magic-sparkles'}></i>
+                            {getCurrentEmailDay() && personalizedFlags[getCurrentEmailDay()!.id] ? 'Re-personalize' : 'Personalize with AI'}
+                          </button>
+                          {addedLeads.length === 0 && (
+                            <p className="wz-ai-notice">Add leads in Step 1 to enable</p>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="wz-preview-empty">
+                        <i className="fas fa-mouse-pointer"></i>
+                        <h4>Select a template</h4>
+                        <p>Click on a template to see its preview here</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
-              {selectedTemplate && (
-                <div className="selected-info-box">
-                  <i className="fas fa-check-circle"></i>
-                  <span>Selected template: <strong>{selectedTemplate.name}</strong></span>
+              {/* Wizard Review Step - Dynamic */}
+              {wizardStep === emailDays.length + 1 && (
+                <div className="wz-review">
+                  <div className="wz-review-header">
+                    <h3>Review Your Email Sequence</h3>
+                    <p>{emailDays.filter(d => d.template).length} emails over {Math.max(...emailDays.map(d => d.dayNumber))} days for {addedLeads.length} leads</p>
+                  </div>
+
+                  <div className="wz-review-timeline">
+                    {emailDays.map((emailDay, idx) => {
+                      const previousDay = idx > 0 ? emailDays[idx - 1] : null
+                      const waitDays = previousDay ? emailDay.dayNumber - previousDay.dayNumber : null
+                      const waitText = waitDays ? `${waitDays} day${waitDays > 1 ? 's' : ''}` : null
+
+                      return (
+                        <React.Fragment key={emailDay.id}>
+                          {waitText && (
+                            <div className="wz-review-wait">
+                              <i className="fas fa-clock"></i> Wait {waitText}
+                            </div>
+                          )}
+                          <div className={`wz-review-card ${emailDay.template ? '' : 'empty'}`}>
+                            <div className="wz-review-day">
+                              <span className="wz-review-badge">Day {emailDay.dayNumber}</span>
+                              <span className="wz-review-label">Email {emailDay.stepOrder}</span>
+                            </div>
+                            {emailDay.template ? (
+                              <div className="wz-review-body">
+                                <h4>{emailDay.template.name}</h4>
+                                <p><strong>Subject:</strong> {emailDay.template.subject_template}</p>
+                                <div className="wz-review-actions">
+                                  <button className="btn-text" onClick={() => setWizardStep(emailDay.stepOrder)}>
+                                    <i className="fas fa-edit"></i> Edit
+                                  </button>
+                                  <button className="btn-text" onClick={() => handleOpenTestEmail(emailDay.template!)}>
+                                    <i className="fas fa-paper-plane"></i> Test
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="wz-review-body empty-body">
+                                <p>No template selected</p>
+                                <button className="btn-text" onClick={() => setWizardStep(emailDay.stepOrder)}>
+                                  <i className="fas fa-plus"></i> Add Email
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </React.Fragment>
+                      )
+                    })}
+                  </div>
+
+                  {/* Batch AI Personalization */}
+                  {addedLeads.length > 0 && (
+                    <div className="wz-batch-ai">
+                      <div className="wz-batch-ai-header">
+                        <i className="fas fa-magic"></i>
+                        <div>
+                          <h4>AI Personalize All Emails</h4>
+                          <p>Automatically adjust all emails to match your {addedLeads.length} leads</p>
+                        </div>
+                      </div>
+                      {batchPersonalizing ? (
+                        <div className="wz-batch-progress">
+                          <div className="wz-batch-bar">
+                            <div className="wz-batch-fill" style={{ width: `${batchProgress}%` }}></div>
+                          </div>
+                          <span>{batchProgress}% complete</span>
+                        </div>
+                      ) : (
+                        <button
+                          className="btn-batch-personalize"
+                          onClick={handleBatchPersonalize}
+                          disabled={emailDays.filter(d => d.template).length === 0}
+                        >
+                          <i className="fas fa-wand-magic-sparkles"></i>
+                          Personalize All with AI
+                        </button>
+                      )}
+                      {Object.values(personalizedFlags).some(Boolean) && (
+                        <div className="wz-batch-status">
+                          <i className="fas fa-check-circle"></i>
+                          {Object.values(personalizedFlags).filter(Boolean).length} of {emailDays.filter(d => d.template).length} emails personalized
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="wz-review-summary">
+                    <h4><i className="fas fa-chart-bar"></i> Campaign Summary</h4>
+                    <div className="wz-summary-stats">
+                      <div className="wz-stat">
+                        <i className="fas fa-envelope"></i>
+                        <span>{emailDays.filter(d => d.template).length} emails</span>
+                      </div>
+                      <div className="wz-stat">
+                        <i className="fas fa-calendar"></i>
+                        <span>{Math.max(...emailDays.map(d => d.dayNumber))}-day sequence</span>
+                      </div>
+                      <div className="wz-stat">
+                        <i className="fas fa-users"></i>
+                        <span>{addedLeads.length} leads</span>
+                      </div>
+                      <div className="wz-stat">
+                        <i className="fas fa-magic"></i>
+                        <span>{Object.values(personalizedFlags).filter(Boolean).length} personalized</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
+
+              {/* Wizard Navigation */}
+              <div className="wizard-navigation">
+                <div className="wizard-nav-left">
+                  {wizardStep > 1 && (
+                    <button className="btn-wizard-back" onClick={wizardStep === emailDays.length + 1 ? () => setWizardStep(emailDays.length) : handleWizardBack}>
+                      <i className="fas fa-arrow-left"></i>
+                      {wizardStep === emailDays.length + 1 ? 'Back to Edit' : `Back`}
+                    </button>
+                  )}
+                </div>
+                <div className="wizard-nav-right">
+                  {wizardStep <= emailDays.length && (
+                    <button className="btn-wizard-skip" onClick={handleSkipEmail}>
+                      Skip
+                    </button>
+                  )}
+                  {wizardStep < emailDays.length && (
+                    <button className="btn-wizard-next" onClick={handleWizardNext}>
+                      Next: Email {wizardStep + 1}
+                      <i className="fas fa-arrow-right"></i>
+                    </button>
+                  )}
+                  {wizardStep === emailDays.length && (
+                    <button className="btn-wizard-next review" onClick={() => setWizardStep(emailDays.length + 1)}>
+                      Review Sequence
+                      <i className="fas fa-clipboard-check"></i>
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
@@ -1230,18 +2033,25 @@ export default function CampaignBuilderPage() {
                 <div className="review-card">
                   <h3 className="review-card-title">
                     <i className="fas fa-envelope"></i>
-                    Email Template
+                    Email Sequence
                   </h3>
                   <div className="review-item">
-                    <span className="review-label">Template:</span>
-                    <span className="review-value">{selectedTemplate?.name || 'Not selected'}</span>
+                    <span className="review-label">Emails:</span>
+                    <span className="review-value">
+                      {emailDays.filter(d => d.template).length} of {emailDays.length} configured
+                    </span>
                   </div>
-                  {selectedTemplate && (
-                    <div className="review-item">
-                      <span className="review-label">Subject:</span>
-                      <span className="review-value">{selectedTemplate.subject_template}</span>
+                  {emailDays.map(emailDay => (
+                    <div className="review-item" key={emailDay.id}>
+                      <span className="review-label">Day {emailDay.dayNumber} (Email {emailDay.stepOrder}):</span>
+                      <span className="review-value">
+                        {emailDay.template
+                          ? emailDay.template.name
+                          : <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>Skipped</span>
+                        }
+                      </span>
                     </div>
-                  )}
+                  ))}
                 </div>
 
                 <div className="review-card">
@@ -1675,6 +2485,455 @@ export default function CampaignBuilderPage() {
         </div>
       )}
 
+      {/* Import Template Modal */}
+      {/* Add Day Modal */}
+      {showAddDayModal && (
+        <div className="le-modal-overlay" onClick={handleCancelAddDay}>
+          <div className="le-modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '450px' }}>
+            <div className="le-modal-header">
+              <h3 className="le-modal-title">Add Email Day</h3>
+              <button className="le-modal-close" onClick={handleCancelAddDay}>
+                <i className="fas fa-times"></i>
+              </button>
+            </div>
+            <div className="le-modal-body" style={{ padding: '24px' }}>
+              <div className="form-group">
+                <label htmlFor="dayNumber" className="form-label">
+                  After how many days should this email be sent?
+                </label>
+                <input
+                  type="number"
+                  id="dayNumber"
+                  className="form-input"
+                  placeholder="e.g., 3, 7, 14"
+                  min="1"
+                  value={newDayNumber}
+                  onChange={(e) => setNewDayNumber(e.target.value)}
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleConfirmAddDay()
+                    }
+                  }}
+                />
+                <p className="form-hint" style={{ marginTop: '8px', fontSize: '13px', color: '#64748b' }}>
+                  Enter the day number when this email should be sent (e.g., 3 for day 3, 7 for day 7)
+                </p>
+              </div>
+            </div>
+            <div className="le-modal-footer" style={{ padding: '16px 24px', borderTop: '1px solid #e2e8f0', display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button className="btn-secondary" onClick={handleCancelAddDay}>
+                Cancel
+              </button>
+              <button className="btn-primary" onClick={handleConfirmAddDay}>
+                <i className="fas fa-plus"></i>
+                Add Day
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showImportModal && (
+        <div className="le-modal-overlay" onClick={() => setShowImportModal(false)}>
+          <div className="le-modal-content le-import-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="le-modal-header">
+              <h3 className="le-modal-title">Import from Email Templates</h3>
+              <button className="le-modal-close" onClick={() => setShowImportModal(false)}>
+                <i className="fas fa-times"></i>
+              </button>
+            </div>
+            <div className="le-import-body">
+              {loadingTemplates ? (
+                <div className="loading-container">
+                  <div className="loading-spinner"></div>
+                  <p>Loading templates...</p>
+                </div>
+              ) : templates.length > 0 ? (
+                <div className="import-templates-grid">
+                  {templates.map(template => (
+                    <div
+                      key={template.id}
+                      className="import-template-card"
+                      onClick={() => handleImportSelect(template)}
+                    >
+                      <div className="import-template-icon">
+                        <i className="fas fa-envelope"></i>
+                      </div>
+                      <div className="import-template-info">
+                        <h4>{template.name}</h4>
+                        <p className="import-template-subject">
+                          <strong>Subject:</strong> {template.subject_template}
+                        </p>
+                        <p className="import-template-preview">
+                          {template.body_template ? template.body_template.substring(0, 80) : 'No preview'}...
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="empty-state-card">
+                  <div className="empty-state-icon">
+                    <i className="fas fa-envelope"></i>
+                  </div>
+                  <h3 className="empty-state-title">No Templates Available</h3>
+                  <p className="empty-state-description">
+                    Create email templates first to import them.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Upload Template Modal */}
+      {showUploadModal && (
+        <div className="le-modal-overlay" onClick={() => setShowUploadModal(false)}>
+          <div className="le-modal-content le-upload-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="le-modal-header">
+              <h3 className="le-modal-title">
+                <i className="fas fa-plus-circle"></i>
+                Create New Template
+              </h3>
+              <button className="le-modal-close" onClick={() => setShowUploadModal(false)}>
+                <i className="fas fa-times"></i>
+              </button>
+            </div>
+            <form onSubmit={async (e) => {
+              e.preventDefault()
+              const form = e.target as HTMLFormElement
+              const name = (form.elements.namedItem('tplName') as HTMLInputElement).value
+              const subject = (form.elements.namedItem('tplSubject') as HTMLInputElement).value
+              const body = (form.elements.namedItem('tplBody') as HTMLTextAreaElement).value
+
+              if (!name || !subject || !body) {
+                alert('Please fill in all fields')
+                return
+              }
+
+              try {
+                const response = await fetch('/api/templates', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    name,
+                    subject_template: subject,
+                    body_template: body,
+                    template_type: 'custom'
+                  })
+                })
+
+                if (response.ok) {
+                  const newTemplate = await response.json()
+                  // Add to templates list and select it
+                  setTemplates(prev => [...prev, newTemplate])
+                  handleTemplateSelect(newTemplate)
+                  setShowUploadModal(false)
+                } else {
+                  alert('Failed to save template')
+                }
+              } catch (err) {
+                console.error('Error saving template:', err)
+                alert('Error saving template')
+              }
+            }}>
+              <div className="le-upload-body">
+                <div className="upload-field">
+                  <label className="form-label">Template Name</label>
+                  <input
+                    type="text"
+                    name="tplName"
+                    className="form-input"
+                    placeholder="e.g., Day 1 - Cold Opener"
+                    required
+                  />
+                </div>
+                <div className="upload-field">
+                  <label className="form-label">Email Subject</label>
+                  <input
+                    type="text"
+                    name="tplSubject"
+                    className="form-input"
+                    placeholder="e.g., Quick question about {{CompanyName}}"
+                    required
+                  />
+                </div>
+                <div className="upload-field">
+                  <label className="form-label">Email Body</label>
+                  <textarea
+                    name="tplBody"
+                    className="form-input form-textarea"
+                    placeholder={"Hi {{FirstName}},\n\nI noticed {{CompanyName}} is...\n\nBest regards,\n{{SenderName}}"}
+                    rows={10}
+                    required
+                  ></textarea>
+                </div>
+                <div className="upload-variables">
+                  <label className="form-label">Available Variables:</label>
+                  <div className="variable-tags">
+                    {['{{FirstName}}', '{{LastName}}', '{{CompanyName}}', '{{Title}}', '{{Industry}}', '{{SenderName}}'].map(v => (
+                      <span key={v} className="variable-tag">{v}</span>
+                    ))}
+                  </div>
+                </div>
+                <div className="upload-tip">
+                  <i className="fas fa-lightbulb"></i>
+                  Keep emails 60-100 words for best deliverability
+                </div>
+              </div>
+              <div className="le-modal-actions">
+                <button type="button" className="le-modal-btn-cancel" onClick={() => setShowUploadModal(false)}>
+                  Cancel
+                </button>
+                <button type="submit" className="le-modal-btn-primary">
+                  <i className="fas fa-save"></i>
+                  Save &amp; Use in Campaign
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* AI Personalization Modal */}
+      {showPersonalizeModal && (
+        <div className="le-modal-overlay" onClick={() => !personalizingEmail && setShowPersonalizeModal(false)}>
+          <div className="le-modal-content le-personalize-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="le-modal-header">
+              <h3 className="le-modal-title">
+                <i className="fas fa-magic"></i>
+                AI Email Personalization
+              </h3>
+              <button className="le-modal-close" onClick={() => !personalizingEmail && setShowPersonalizeModal(false)}>
+                <i className="fas fa-times"></i>
+              </button>
+            </div>
+
+            {personalizingEmail ? (
+              <div className="personalize-loading">
+                <div className="loading-spinner"></div>
+                <h4>Analyzing your leads...</h4>
+                <p>AI is reviewing {addedLeads.length} leads and adjusting the email to match their profiles</p>
+              </div>
+            ) : personalizeResult ? (
+              <div className="personalize-result">
+                {/* Analysis Summary */}
+                <div className="personalize-analysis">
+                  <h4><i className="fas fa-chart-pie"></i> Lead Analysis</h4>
+                  <div className="analysis-chips">
+                    {personalizeResult.analysis.industries_detected?.map((ind, i) => (
+                      <span key={i} className="analysis-chip industry">{ind}</span>
+                    ))}
+                    {personalizeResult.analysis.titles_detected?.map((title, i) => (
+                      <span key={i} className="analysis-chip title">{title}</span>
+                    ))}
+                  </div>
+                  {personalizeResult.analysis.tone_adjustment && (
+                    <p className="analysis-tone"><strong>Tone:</strong> {personalizeResult.analysis.tone_adjustment}</p>
+                  )}
+                </div>
+
+                {/* Changes Made */}
+                <div className="personalize-changes">
+                  <h4><i className="fas fa-list-check"></i> Changes Made</h4>
+                  <ul>
+                    {personalizeResult.changes_made.map((change, i) => (
+                      <li key={i}>{change}</li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* Diff View */}
+                <div className="personalize-diff">
+                  <div className="diff-column original">
+                    <h4><i className="fas fa-file-alt"></i> Original</h4>
+                    <div className="diff-subject">
+                      <strong>Subject:</strong> {personalizeResult.original.subject}
+                    </div>
+                    <div className="diff-body">{personalizeResult.original.body}</div>
+                  </div>
+                  <div className="diff-arrow">
+                    <i className="fas fa-arrow-right"></i>
+                  </div>
+                  <div className="diff-column personalized">
+                    <h4><i className="fas fa-sparkles"></i> Personalized</h4>
+                    {personalizeEditMode ? (
+                      <>
+                        <div className="diff-edit-field">
+                          <label>Subject:</label>
+                          <input
+                            type="text"
+                            className="form-input"
+                            value={personalizeEditSubject}
+                            onChange={(e) => setPersonalizeEditSubject(e.target.value)}
+                          />
+                        </div>
+                        <div className="diff-edit-field">
+                          <label>Body:</label>
+                          <textarea
+                            className="form-input form-textarea"
+                            value={personalizeEditBody}
+                            onChange={(e) => setPersonalizeEditBody(e.target.value)}
+                            rows={8}
+                          />
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="diff-subject">
+                          <strong>Subject:</strong> {personalizeResult.personalized.subject}
+                        </div>
+                        <div className="diff-body">{personalizeResult.personalized.body}</div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            {personalizeResult && (
+              <div className="le-modal-actions personalize-actions">
+                <button
+                  className="le-modal-btn-cancel"
+                  onClick={() => { setShowPersonalizeModal(false); setPersonalizeResult(null) }}
+                >
+                  Reject
+                </button>
+                <button
+                  className="btn-personalize-edit"
+                  onClick={() => {
+                    if (personalizeEditMode) {
+                      setPersonalizeEditMode(false)
+                    } else {
+                      setPersonalizeEditSubject(personalizeResult.personalized.subject)
+                      setPersonalizeEditBody(personalizeResult.personalized.body)
+                      setPersonalizeEditMode(true)
+                    }
+                  }}
+                >
+                  <i className={personalizeEditMode ? 'fas fa-eye' : 'fas fa-edit'}></i>
+                  {personalizeEditMode ? 'Preview' : 'Edit'}
+                </button>
+                <button
+                  className="le-modal-btn-primary"
+                  onClick={handleAcceptPersonalization}
+                >
+                  <i className="fas fa-check"></i>
+                  {personalizeEditMode ? 'Save & Apply' : 'Accept Changes'}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Test Email Modal */}
+      {showTestEmailModal && selectedTestTemplate && (
+        <div className="le-modal-overlay" onClick={() => setShowTestEmailModal(false)}>
+          <div className="le-modal-content le-test-email-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="le-modal-header">
+              <h3 className="le-modal-title">
+                <i className="fas fa-paper-plane"></i>
+                Send Test Email
+              </h3>
+              <button className="le-modal-close" onClick={() => setShowTestEmailModal(false)}>
+                <i className="fas fa-times"></i>
+              </button>
+            </div>
+            <div className="le-test-email-body">
+              <div className="test-email-info">
+                <div className="test-email-template">
+                  <label className="test-email-label">Template:</label>
+                  <div className="test-email-template-name">
+                    <i className={selectedTestTemplate.id < 0 ? "fas fa-robot" : "fas fa-envelope"}></i>
+                    {selectedTestTemplate.name}
+                  </div>
+                </div>
+                <div className="test-email-subject">
+                  <label className="test-email-label">Subject:</label>
+                  <div className="test-email-subject-text">{selectedTestTemplate.subject_template}</div>
+                </div>
+              </div>
+              <div className="test-email-form">
+                <div className="test-email-field">
+                  <label className="form-label">
+                    <i className="fas fa-envelope"></i>
+                    Recipient Email Address
+                  </label>
+                  <input
+                    type="email"
+                    className="form-input"
+                    placeholder="Enter test email address (e.g., your.email@example.com)"
+                    value={testEmailAddress}
+                    onChange={(e) => setTestEmailAddress(e.target.value)}
+                    autoFocus
+                  />
+                </div>
+                <div className="test-email-field">
+                  <label className="form-label">
+                    <i className="fas fa-user"></i>
+                    Sender Account
+                  </label>
+                  {senders.filter(s => s.status === 'connected').length > 0 ? (
+                    <select
+                      className="form-input"
+                      value={selectedTestSender || ''}
+                      onChange={(e) => setSelectedTestSender(Number(e.target.value))}
+                    >
+                      <option value="" disabled>Select a sender...</option>
+                      {senders
+                        .filter(s => s.status === 'connected')
+                        .map(sender => (
+                          <option key={sender.id} value={sender.id}>
+                            {sender.email} {sender.isDefault ? '(Default)' : ''}
+                          </option>
+                        ))}
+                    </select>
+                  ) : (
+                    <div className="test-email-no-sender">
+                      <i className="fas fa-exclamation-triangle"></i>
+                      <span>No sender accounts connected. <a href="/campaign-manager/sender-profile">Connect Gmail</a></span>
+                    </div>
+                  )}
+                </div>
+                <p className="test-email-note">
+                  <i className="fas fa-info-circle"></i>
+                  This email will be sent with test data (Test User, Test Company) to verify your template and sender configuration.
+                </p>
+              </div>
+            </div>
+            <div className="le-modal-actions">
+              <button
+                className="le-modal-btn-cancel"
+                onClick={() => setShowTestEmailModal(false)}
+                disabled={sendingTestEmail}
+              >
+                Cancel
+              </button>
+              <button
+                className="le-modal-btn-primary"
+                onClick={handleSendTestEmail}
+                disabled={sendingTestEmail || !testEmailAddress || !selectedTestSender}
+              >
+                {sendingTestEmail ? (
+                  <>
+                    <i className="fas fa-spinner fa-spin"></i>
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <i className="fas fa-paper-plane"></i>
+                    Send Test Email
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
         <div className="le-modal-overlay" onClick={() => setShowDeleteModal(null)}>
@@ -1748,5 +3007,13 @@ export default function CampaignBuilderPage() {
         </div>
       )}
     </MainLayout>
+  )
+}
+
+export default function CampaignBuilderPageWrapper() {
+  return (
+    <Suspense fallback={<MainLayout><div className="loading-container"><div className="loading-spinner"></div><p>Loading...</p></div></MainLayout>}>
+      <CampaignBuilderPage />
+    </Suspense>
   )
 }

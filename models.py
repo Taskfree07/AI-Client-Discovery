@@ -57,6 +57,69 @@ class EmailTemplate(db.Model):
     is_default = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+
+# Email Sequence Models
+class CampaignEmailSequence(db.Model):
+    """Multi-step email sequence for a campaign"""
+    __tablename__ = 'campaign_email_sequence'
+    id = db.Column(db.Integer, primary_key=True)
+    campaign_id = db.Column(db.Integer, db.ForeignKey('campaign.id'), nullable=False)
+    sequence_name = db.Column(db.String(200))
+    ai_personalization_enabled = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    steps = db.relationship('CampaignEmailStep', backref='sequence', cascade='all, delete-orphan', lazy=True, order_by='CampaignEmailStep.step_number')
+
+
+class CampaignEmailStep(db.Model):
+    """Individual step in an email sequence"""
+    __tablename__ = 'campaign_email_step'
+    id = db.Column(db.Integer, primary_key=True)
+    sequence_id = db.Column(db.Integer, db.ForeignKey('campaign_email_sequence.id'), nullable=False)
+    step_number = db.Column(db.Integer, nullable=False)
+    email_template_id = db.Column(db.Integer, db.ForeignKey('email_template.id'), nullable=False)
+    days_after_previous = db.Column(db.Integer, default=0)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    template = db.relationship('EmailTemplate', backref='sequence_steps')
+    __table_args__ = (db.UniqueConstraint('sequence_id', 'step_number', name='unique_step_number_per_sequence'),)
+
+
+class LeadEmailState(db.Model):
+    """Track email sending state for each lead in a campaign"""
+    __tablename__ = 'lead_email_state'
+    id = db.Column(db.Integer, primary_key=True)
+    campaign_id = db.Column(db.Integer, db.ForeignKey('campaign.id'), nullable=False)
+    lead_email = db.Column(db.String(200), nullable=False)
+    lead_name = db.Column(db.String(200))
+    lead_company = db.Column(db.String(200))
+    lead_title = db.Column(db.String(200))
+    current_step = db.Column(db.Integer, default=0)
+    status = db.Column(db.String(20), default='pending')
+    stopped_reason = db.Column(db.String(100))
+    last_email_sent_at = db.Column(db.DateTime)
+    next_email_scheduled_at = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    __table_args__ = (db.UniqueConstraint('campaign_id', 'lead_email', name='unique_campaign_lead_email'),)
+
+
+class EmailSendLog(db.Model):
+    """Log of all emails sent"""
+    __tablename__ = 'email_send_log'
+    id = db.Column(db.Integer, primary_key=True)
+    lead_email_state_id = db.Column(db.Integer, db.ForeignKey('lead_email_state.id'), nullable=False)
+    step_number = db.Column(db.Integer, nullable=False)
+    email_template_id = db.Column(db.Integer, db.ForeignKey('email_template.id'))
+    subject = db.Column(db.Text)
+    body = db.Column(db.Text)
+    sent_at = db.Column(db.DateTime, default=datetime.utcnow)
+    status = db.Column(db.String(20), default='sent')
+    opened_at = db.Column(db.DateTime)
+    clicked_at = db.Column(db.DateTime)
+    replied_at = db.Column(db.DateTime)
+    error_message = db.Column(db.Text)
+    lead_state = db.relationship('LeadEmailState', backref='email_logs')
+
+
 class JobLead(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     campaign_id = db.Column(db.Integer, db.ForeignKey('campaign.id'))

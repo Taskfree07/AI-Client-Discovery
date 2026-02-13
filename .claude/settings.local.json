@@ -91,7 +91,11 @@
       "Bash(npm run build:*)",
       "Bash(az:*)",
       "Bash(set AZURE_CLI_DISABLE_CONNECTION_VERIFICATION=1)",
-      "Bash(test:*)"
+      "Bash(test:*)",
+      "Bash(git fetch:*)",
+      "Bash(git checkout:*)",
+      "Bash(cd:*)",
+      "Bash(git stash:*)"
     ],
     "deny": [],
     "ask": []

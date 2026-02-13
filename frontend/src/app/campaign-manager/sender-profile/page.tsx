@@ -1,7 +1,7 @@
 'use client'
 
 import MainLayout from '@/components/MainLayout'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 
 interface Sender {
@@ -13,7 +13,7 @@ interface Sender {
   isDefault: boolean
 }
 
-export default function SenderProfilePage() {
+function SenderProfileContent() {
   const [senders, setSenders] = useState<Sender[]>([])
   const [loading, setLoading] = useState(true)
   const [openMenuId, setOpenMenuId] = useState<number | null>(null)
@@ -222,5 +222,13 @@ export default function SenderProfilePage() {
         <span>Security Note: We use OAuth and API-based sending. Your password is never stored.</span>
       </div>
     </MainLayout>
+  )
+}
+
+export default function SenderProfilePage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <SenderProfileContent />
+    </Suspense>
   )
 }

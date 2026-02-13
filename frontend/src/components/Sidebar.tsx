@@ -24,9 +24,6 @@ export default function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
     if (!mounted) return
 
     const groups = new Set<string>()
-    if (pathname.startsWith('/lead-engine') || pathname.startsWith('/session-manager')) {
-      groups.add('lead-engine')
-    }
     if (pathname.startsWith('/campaign-manager')) {
       groups.add('campaign-manager')
     }
@@ -83,17 +80,16 @@ export default function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
               href="/campaign-manager"
               className={`nav-link nav-group-header ${isActive('/campaign-manager') ? 'active' : isGroupActive(['/campaign-manager']) ? 'group-active' : ''}`}
               onClick={(e) => {
-                if (!expandedGroups.has('campaign-manager')) {
-                  toggleGroup('campaign-manager')
-                }
+                // Only toggle dropdown, don't prevent navigation
+                toggleGroup('campaign-manager')
               }}
             >
-              <i className="fas fa-users nav-icon"></i>
+              <i className="fas fa-bullhorn nav-icon"></i>
               {!collapsed && (
                 <>
                   <span>Campaign Manager</span>
-                  <span className="nav-arrow">
-                    <i className="fas fa-chevron-down"></i>
+                  <span className="nav-arrow" onClick={(e) => { e.preventDefault(); toggleGroup('campaign-manager'); }}>
+                    <i className={`fas fa-chevron-${expandedGroups.has('campaign-manager') ? 'up' : 'down'}`}></i>
                   </span>
                 </>
               )}
@@ -103,7 +99,7 @@ export default function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
             <div className={`nav-submenu ${expandedGroups.has('campaign-manager') ? 'show' : ''}`}>
               <div className="nav-item">
                 <Link href="/campaign-manager/sender-profile" className={`nav-link ${isActive('/campaign-manager/sender-profile') ? 'active' : ''}`}>
-                  <span>Sender </span>
+                  <span>Sender Profile</span>
                 </Link>
               </div>
               <div className="nav-item">

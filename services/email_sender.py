@@ -1,6 +1,12 @@
 import msal
 import requests
 from typing import Dict, Optional
+import sys
+import os
+
+# Add parent directory to path to import utils
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils.email_utils import text_to_html_email
 
 class EmailSender:
     def __init__(self, client_id: str, client_secret: str, tenant_id: str):
@@ -60,12 +66,15 @@ class EmailSender:
 
             url = f"https://graph.microsoft.com/v1.0/users/{from_email}/sendMail"
 
+            # Convert plain text to professional HTML format
+            html_body = text_to_html_email(body)
+
             email_msg = {
                 "message": {
                     "subject": subject,
                     "body": {
                         "contentType": "HTML",
-                        "content": body.replace('\n', '<br>')
+                        "content": html_body
                     },
                     "toRecipients": [
                         {

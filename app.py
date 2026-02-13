@@ -10,13 +10,50 @@ from services.sheets_logger import SheetsLogger
 from services.scheduler import CampaignScheduler
 from services.job_parser import JobParserService
 from services.ai_lead_scorer import AILeadScorer
+from utils.email_utils import text_to_html_email, replace_email_variables
 from datetime import datetime
 from urllib.parse import urlparse
 import os
 import json
+from functools import wraps
+import time
 
 # Allow OAuth over HTTP for local development
 os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+
+# ========================================
+# APOLLO API RATE LIMITING SAFEGUARD
+# ========================================
+apollo_call_timestamps = []
+APOLLO_MAX_CALLS_PER_MINUTE = 200  # Safeguard limit (2x normal to allow bursts)
+
+def apollo_rate_limit(f):
+    """
+    Decorator to limit Apollo API calls to prevent runaway processes.
+    Tracks calls per minute and rejects requests if limit exceeded.
+    """
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        global apollo_call_timestamps
+        now = time.time()
+
+        # Remove timestamps older than 1 minute
+        apollo_call_timestamps = [t for t in apollo_call_timestamps if now - t < 60]
+
+        # Check if limit exceeded
+        if len(apollo_call_timestamps) >= APOLLO_MAX_CALLS_PER_MINUTE:
+            return jsonify({
+                'success': False,
+                'error': f'Rate limit exceeded: Too many requests per minute. Maximum allowed: {APOLLO_MAX_CALLS_PER_MINUTE}/minute',
+                'max_per_minute': APOLLO_MAX_CALLS_PER_MINUTE,
+                'current_count': len(apollo_call_timestamps)
+            }), 429
+
+        # Log this call
+        apollo_call_timestamps.append(now)
+
+        return f(*args, **kwargs)
+    return decorated_function
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -46,6 +83,29 @@ def save_setting(key, value):
         db.session.add(setting)
     db.session.commit()
 
+def log_apollo_call(endpoint, params_summary):
+    """
+    Log Apollo API calls for audit trail.
+    Creates logs/apollo_api_calls.log if it doesn't exist.
+    """
+    import logging
+    from pathlib import Path
+
+    # Ensure logs directory exists
+    Path('logs').mkdir(exist_ok=True)
+
+    # Configure logger
+    logger = logging.getLogger('apollo_api')
+    if not logger.handlers:
+        handler = logging.FileHandler('logs/apollo_api_calls.log')
+        formatter = logging.Formatter('%(asctime)s - %(message)s')
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+        logger.setLevel(logging.INFO)
+
+    # Log the call
+    logger.info(f"APOLLO_CALL: {endpoint} | {params_summary} | IP: {request.remote_addr}")
+
 def log_activity(campaign_id, action, details, status='success'):
     """Log an activity"""
     log = ActivityLog(
@@ -56,6 +116,78 @@ def log_activity(campaign_id, action, details, status='success'):
     )
     db.session.add(log)
     db.session.commit()
+
+# ========================================
+# APOLLO API SECURITY LAYER
+# ========================================
+
+def init_apollo_api_key():
+    """
+    Initialize Apollo API key from environment variable to database.
+    This should only be called once during app initialization.
+    SECURITY: Keeps API key in database, not exposed in code.
+    """
+    apollo_key_from_env = os.getenv('APOLLO_API_KEY', '')
+
+    if apollo_key_from_env:
+        # Check if key exists in database
+        existing = Settings.query.filter_by(key='apollo_api_key').first()
+        if not existing:
+            # Save to database
+            save_setting('apollo_api_key', apollo_key_from_env)
+            print(f"✅ SECURITY: Apollo API key initialized from environment")
+        else:
+            # Update if different
+            if existing.value != apollo_key_from_env:
+                existing.value = apollo_key_from_env
+                db.session.commit()
+                print(f"✅ SECURITY: Apollo API key updated from environment")
+
+# ALLOWED ENDPOINTS - Only these can use Apollo API
+APOLLO_ALLOWED_ENDPOINTS = [
+    '/api/apollo/enrich-company',
+    '/api/apollo/find-contacts',
+    '/api/apollo/reveal-email',
+    '/api/apollo/search-companies',
+    '/api/apollo/search-employees'
+]
+
+def validate_apollo_request():
+    """
+    Validate that Apollo API requests are coming from allowed endpoints only.
+    SECURITY: Prevents unauthorized API usage and protects credits.
+    """
+    # Check if request path is in allowed list
+    if request.path not in APOLLO_ALLOWED_ENDPOINTS:
+        print(f"❌ SECURITY VIOLATION: Unauthorized Apollo API access attempt from: {request.path}")
+        log_apollo_call(f"BLOCKED: {request.path}", "Unauthorized endpoint")
+        return False
+
+    # Log the authorized request
+    print(f"✅ SECURITY: Authorized Apollo API request to: {request.path}")
+    return True
+
+def get_apollo_api_key_secure():
+    """
+    Securely retrieve Apollo API key with validation.
+    SECURITY: Returns None if validation fails or key not found.
+    Only returns key for allowed endpoints.
+    """
+    # Validate request is from allowed endpoint
+    if not validate_apollo_request():
+        return None
+
+    # Get API key from database (not environment, for security)
+    api_key = get_setting('apollo_api_key')
+
+    if not api_key:
+        print("❌ SECURITY: Apollo API key not found in database")
+        return None
+
+    # Log successful key retrieval
+    log_apollo_call(request.path, str(request.get_json() or {})[:100])
+
+    return api_key
 
 # ==================== FRONTEND ROUTES REMOVED ====================
 # All frontend routes removed - Next.js handles UI routing
@@ -407,17 +539,22 @@ def execute_campaign(campaign):
     try:
         log_activity(campaign.id, 'campaign_started', f'Campaign "{campaign.name}" started', 'success')
 
-        # Get API keys from settings
-        google_api_key = get_setting('google_api_key')
-        google_cx = get_setting('google_cx_code')
-        apollo_api_key = get_setting('apollo_api_key')
+        # SECURITY: Apollo API disabled for campaign execution
+        # Apollo API only allowed for Session Manager lead search
+        # Use Session Manager to import leads instead
+        return {
+            'success': False,
+            'message': 'Apollo API disabled for campaign execution. Please use Session Manager to import leads.'
+        }
 
-        if not all([google_api_key, google_cx, apollo_api_key]):
-            return {'success': False, 'message': 'API keys not configured. Please check settings.'}
+        # Get API keys from settings (DISABLED)
+        # google_api_key = get_setting('google_api_key')
+        # google_cx = get_setting('google_cx_code')
+        # apollo_api_key = DISABLED FOR SECURITY
 
-        # Initialize services
-        google_search = GoogleSearchService(google_api_key, google_cx)
-        apollo_api = ApolloAPIService(apollo_api_key)
+        # Initialize services (DISABLED)
+        # google_search = GoogleSearchService(google_api_key, google_cx)
+        # apollo_api = DISABLED FOR SECURITY
 
         # Search for jobs
         jobs = google_search.search_jobs(campaign.search_keywords, campaign.jobs_per_run)
@@ -587,7 +724,13 @@ def create_template():
         db.session.add(template)
         db.session.commit()
 
-        return jsonify({'success': True, 'template_id': template.id})
+        return jsonify({
+            'id': template.id,
+            'name': template.name,
+            'subject_template': template.subject_template,
+            'body_template': template.body_template,
+            'is_default': template.is_default
+        })
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 400
 
@@ -801,12 +944,12 @@ def pipeline_company():
         min_employees = int(data.get('min_employees', 50))
         max_employees = int(data.get('max_employees', 500))
 
-        apollo_api_key = get_setting('apollo_api_key')
+        apollo_api_key = get_apollo_api_key_secure()
 
         if not apollo_api_key:
             return jsonify({
                 'success': False,
-                'message': 'Apollo API not configured. Go to Settings.'
+                'message': 'Apollo API not configured or unauthorized access.'
             })
 
         print(f"\n[COMPANY] Enriching company: {domain}")
@@ -890,15 +1033,23 @@ def pipeline_company():
 
 @app.route('/api/pipeline/contact', methods=['POST'])
 def pipeline_contact():
-    """Step 3: Find and enrich decision maker contacts with email reveal"""
+    """Step 3: DISABLED - Apollo API only allowed for Session Manager"""
+    return jsonify({
+        'success': False,
+        'message': 'Apollo API disabled for pipeline. Use Session Manager for lead search.'
+    })
+
+    # SECURITY: Apollo API disabled - use Session Manager instead
+    """
     try:
         data = request.json
         domain = data.get('domain')
-        role_type = data.get('role_type', 'executive')  # executive, tech, hr, sales, marketing, finance, all
+        role_type = data.get('role_type', 'executive')
         per_page = int(data.get('per_page', 10))
-        reveal_all = data.get('reveal_all', False)  # Whether to reveal emails for all contacts
+        reveal_all = data.get('reveal_all', False)
 
-        apollo_api_key = get_setting('apollo_api_key')
+        # DISABLED FOR SECURITY
+        apollo_api_key = None  # get_setting('apollo_api_key')
 
         if not apollo_api_key:
             return jsonify({'success': False, 'message': 'Apollo API not configured'})
@@ -1010,12 +1161,20 @@ def pipeline_contact():
 
 @app.route('/api/pipeline/reveal-email', methods=['POST'])
 def pipeline_reveal_email():
-    """Step 3.5: Reveal contact email using Apollo /v1/people/match (uses credits)"""
+    """DISABLED - Apollo API only allowed for Session Manager"""
+    return jsonify({
+        'success': False,
+        'message': 'Apollo API disabled for pipeline. Use Session Manager for lead search.'
+    })
+
+    # SECURITY: Apollo API disabled - use Session Manager instead
+    """
     try:
         data = request.json
         person_id = data.get('person_id')
 
-        apollo_api_key = get_setting('apollo_api_key')
+        # DISABLED FOR SECURITY
+        apollo_api_key = None  # get_setting('apollo_api_key')
 
         if not apollo_api_key:
             return jsonify({'success': False, 'message': 'Apollo API not configured'})
@@ -1068,12 +1227,12 @@ def pipeline_company_name_search():
                 'message': 'Company name is required'
             })
 
-        apollo_api_key = get_setting('apollo_api_key')
+        apollo_api_key = get_apollo_api_key_secure()
 
         if not apollo_api_key:
             return jsonify({
                 'success': False,
-                'message': 'Apollo API not configured. Go to Settings.'
+                'message': 'Apollo API not configured or unauthorized access.'
             })
 
         print(f"\n[COMPANY SEARCH] Searching for: {company_name}")
@@ -1131,12 +1290,12 @@ def pipeline_company_employees():
                 'message': 'Company domain is required'
             })
 
-        apollo_api_key = get_setting('apollo_api_key')
+        apollo_api_key = get_apollo_api_key_secure()
 
         if not apollo_api_key:
             return jsonify({
                 'success': False,
-                'message': 'Apollo API not configured. Go to Settings.'
+                'message': 'Apollo API not configured or unauthorized access.'
             })
 
         print(f"\n[EMPLOYEE SEARCH] Finding employees at: {company_name or domain}")
@@ -1648,6 +1807,7 @@ def get_ai_agent_stats():
 # ==================== LEAD ENGINE API ====================
 
 @app.route('/api/lead-engine/generate', methods=['POST'])
+@apollo_rate_limit  # Prevent excessive Apollo API calls
 def lead_engine_generate():
     """
     Lead Engine - Generate leads from job openings using Google Custom Search + Apollo
@@ -1717,6 +1877,9 @@ def lead_engine_generate():
             # Initialize Lead Engine
             from services.lead_engine import get_lead_engine
             engine = get_lead_engine()
+
+            # Log Apollo API call start
+            log_apollo_call('lead-engine/generate', f"job_titles={job_titles}, num_jobs={num_jobs}, locations={locations}")
 
             # Track stats
             total_leads = 0
@@ -1806,6 +1969,532 @@ def lead_engine_generate():
             yield json.dumps({'type': 'error', 'message': str(e)}) + '\n'
 
     return Response(stream_with_context(generate()), mimetype='application/x-ndjson')
+
+
+# ==================== AI EMAIL GENERATION ====================
+
+@app.route('/api/campaigns/generate-sequence', methods=['POST'])
+def generate_email_sequence():
+    """AI-powered email sequence generator - generates multiple options per day"""
+    try:
+        import os
+        import google.generativeai as genai
+        from collections import Counter
+
+        data = request.json
+        leads = data.get('leads', [])
+        sender_name = data.get('sender_name', 'Your Team')
+        template_pref = data.get('template_preference', 'auto')
+
+        if not leads:
+            return jsonify({'success': False, 'message': 'No leads provided'}), 400
+
+        # Analyze leads to determine best template structure
+        industries = [lead.get('industry', 'Technology') for lead in leads if lead.get('industry')]
+        titles = [lead.get('title', '') for lead in leads if lead.get('title')]
+        companies = [lead.get('company', '') for lead in leads if lead.get('company')]
+
+        # Get most common industry
+        industry_counts = Counter(industries)
+        dominant_industry = industry_counts.most_common(1)[0][0] if industry_counts else 'Technology'
+
+        # Detect if it's manufacturing or tech/saas
+        is_manufacturing = any(kw in dominant_industry.lower() for kw in ['manufacturing', 'industrial', 'production', 'plant', 'factory'])
+        is_saas = any(kw in dominant_industry.lower() for kw in ['software', 'saas', 'technology', 'it services', 'product', 'tech'])
+
+        # Detect seniority level (for tone selection)
+        senior_keywords = ['ceo', 'cto', 'cfo', 'vp', 'vice president', 'director', 'head', 'chief', 'chro']
+        has_senior_titles = any(any(kw in title.lower() for kw in senior_keywords) for title in titles)
+
+        # Determine template category
+        if template_pref == 'auto':
+            if is_manufacturing:
+                template_category = 'Manufacturing (Formal)' if has_senior_titles else 'Manufacturing (Direct)'
+            elif is_saas:
+                template_category = 'SaaS/Product'
+            else:
+                template_category = 'Professional Tech'
+        elif template_pref == 'manufacturing':
+            template_category = 'Manufacturing (Formal)' if has_senior_titles else 'Manufacturing (Direct)'
+        else:
+            template_category = 'SaaS/Product'
+
+        # Prepare lead summary for AI
+        lead_summary = f"""
+Campaign Profile:
+- Total Leads: {len(leads)}
+- Primary Industry: {dominant_industry}
+- Sample Companies: {', '.join(companies[:5])}
+- Sample Roles: {', '.join(set(titles[:5]))}
+- Seniority: {'Senior/Executive' if has_senior_titles else 'Mid-level/Manager'}
+"""
+
+        # Get reference templates from database
+        if 'Manufacturing' in template_category:
+            if 'Direct' in template_category:
+                ref_templates = EmailTemplate.query.filter(
+                    EmailTemplate.name.like('%Manufacturing A%')
+                ).order_by(EmailTemplate.id).limit(4).all()
+            else:
+                ref_templates = EmailTemplate.query.filter(
+                    EmailTemplate.name.like('%Manufacturing B%')
+                ).order_by(EmailTemplate.id).limit(4).all()
+        else:
+            ref_templates = EmailTemplate.query.filter(
+                EmailTemplate.name.like('%SaaS/Product%')
+            ).order_by(EmailTemplate.id).limit(4).all()
+
+        if not ref_templates or len(ref_templates) < 4:
+            return jsonify({
+                'success': False,
+                'message': 'Reference templates not found in database'
+            }), 400
+
+        # Generate custom sequence using Gemini (with fallback key)
+        gemini_keys = [k for k in [
+            os.getenv('GEMINI_API_KEY'),
+            os.getenv('GEMINI_API_KEY_FALLBACK')
+        ] if k]
+        if not gemini_keys:
+            return jsonify({'success': False, 'message': 'Gemini API key not configured'}), 500
+
+        prompt = f"""You are an expert email copywriter. Generate MULTIPLE email options for a 4-step recruiting/staffing outreach sequence.
+
+{lead_summary}
+
+TEMPLATE STRUCTURE TO FOLLOW (use as inspiration, not verbatim):
+
+EMAIL 1 (OPENER):
+Reference: {ref_templates[0].subject_template}
+Structure: {ref_templates[0].body_template[:200]}...
+
+EMAIL 2 (FOLLOW-UP):
+Reference: {ref_templates[1].subject_template}
+Structure: {ref_templates[1].body_template[:200]}...
+
+EMAIL 3 (VALUE/URGENCY):
+Reference: {ref_templates[2].subject_template}
+Structure: {ref_templates[2].body_template[:200]}...
+
+EMAIL 4 (BREAKUP):
+Reference: {ref_templates[3].subject_template}
+Structure: {ref_templates[3].body_template[:200]}...
+
+SPAM-FREE BEST PRACTICES (CRITICAL):
+✅ Keep each email 60-100 words max
+✅ Personal, conversational tone (not corporate)
+✅ AVOID spam triggers: "free", "guarantee", "100%", "risk-free", "act now"
+✅ AVOID ALL CAPS in subjects or excessive punctuation (!!!)
+✅ Use variables: {{{{FirstName}}}}, {{{{CompanyName}}}}, {{{{SenderName}}}}
+✅ Professional subject lines (under 50 characters)
+✅ Clear value in first sentence
+✅ Specific pain points for {dominant_industry} (not generic)
+✅ Soft call-to-action (no pressure)
+✅ Short paragraphs (2-3 lines max)
+✅ No heavy formatting, images, or attachments
+
+INSTRUCTIONS:
+1. Generate MULTIPLE OPTIONS per day:
+   - Day 1 (Opener): 3 different options
+   - Day 3 (Follow-up): 3 different options
+   - Day 7 (Value/Urgency): 3 different options
+   - Day 11 (Breakup): 2 different options
+2. Each option must be UNIQUE with different angles/styles
+3. Make them SPECIFIC to {dominant_industry} industry
+4. Address pain points relevant to {', '.join(set(titles[:3]))} roles
+5. Keep tone {'professional and consultative' if has_senior_titles else 'direct and action-oriented'}
+6. Follow spam-free best practices above
+
+OUTPUT FORMAT (STRICT):
+DAY_1_OPTION_A_SUBJECT: [subject]
+DAY_1_OPTION_A_BODY: [body]
+---
+DAY_1_OPTION_B_SUBJECT: [subject]
+DAY_1_OPTION_B_BODY: [body]
+---
+DAY_1_OPTION_C_SUBJECT: [subject]
+DAY_1_OPTION_C_BODY: [body]
+---
+DAY_3_OPTION_A_SUBJECT: [subject]
+DAY_3_OPTION_A_BODY: [body]
+---
+DAY_3_OPTION_B_SUBJECT: [subject]
+DAY_3_OPTION_B_BODY: [body]
+---
+DAY_3_OPTION_C_SUBJECT: [subject]
+DAY_3_OPTION_C_BODY: [body]
+---
+DAY_7_OPTION_A_SUBJECT: [subject]
+DAY_7_OPTION_A_BODY: [body]
+---
+DAY_7_OPTION_B_SUBJECT: [subject]
+DAY_7_OPTION_B_BODY: [body]
+---
+DAY_7_OPTION_C_SUBJECT: [subject]
+DAY_7_OPTION_C_BODY: [body]
+---
+DAY_11_OPTION_A_SUBJECT: [subject]
+DAY_11_OPTION_A_BODY: [body]
+---
+DAY_11_OPTION_B_SUBJECT: [subject]
+DAY_11_OPTION_B_BODY: [body]
+
+Generate the options now:"""
+
+        generated_text = None
+        last_error = None
+        for api_key in gemini_keys:
+            try:
+                genai.configure(api_key=api_key)
+                model = genai.GenerativeModel('gemini-2.5-flash')
+                response = model.generate_content(prompt)
+                generated_text = response.text.strip()
+                break  # Success, stop trying keys
+            except Exception as api_error:
+                last_error = api_error
+                error_msg = str(api_error)
+                print(f"Gemini API error with key ...{api_key[-6:]}: {error_msg}")
+                if '429' in error_msg or 'quota' in error_msg.lower() or 'resource' in error_msg.lower():
+                    continue  # Try next key
+                else:
+                    return jsonify({
+                        'success': False,
+                        'message': f'Gemini API error: {error_msg}',
+                        'error_type': 'api_error'
+                    }), 500
+
+        if not generated_text:
+            return jsonify({
+                'success': False,
+                'message': f'Gemini API quota exceeded on all keys. Please try again later.',
+                'error_type': 'quota_exceeded'
+            }), 429
+
+        # Parse the generated sequence with multiple options
+        emails = []
+        email_blocks = generated_text.split('---')
+
+        for block in email_blocks:
+            lines = block.strip().split('\n')
+            subject = ''
+            body_lines = []
+            day = None
+            option = None
+
+            for line in lines:
+                # Parse DAY_X_OPTION_Y_SUBJECT format
+                if '_SUBJECT:' in line:
+                    parts = line.split('_')
+                    if len(parts) >= 4:
+                        day = int(parts[1])
+                        option = parts[3]
+                        subject = line.split(':', 1)[1].strip()
+                # Parse DAY_X_OPTION_Y_BODY format
+                elif '_BODY:' in line:
+                    body_lines.append(line.split(':', 1)[1].strip())
+                elif subject and line.strip():
+                    body_lines.append(line.strip())
+
+            body = '\n\n'.join([line for line in body_lines if line])
+
+            if subject and body and day and option:
+                emails.append({
+                    'day': day,
+                    'option': option,
+                    'subject': subject,
+                    'body': body
+                })
+
+        if len(emails) < 8:  # At least 8 options expected (3+3+2+2 minimum)
+            return jsonify({
+                'success': False,
+                'message': 'AI generated incomplete sequence. Please try again.',
+                'debug': f'Generated {len(emails)} options, expected at least 8'
+            }), 400
+
+        # Group emails by day for frontend
+        emails_by_day = {}
+        for email in emails:
+            day = email['day']
+            if day not in emails_by_day:
+                emails_by_day[day] = []
+            emails_by_day[day].append(email)
+
+        return jsonify({
+            'success': True,
+            'emails': emails,  # All options
+            'emails_by_day': emails_by_day,  # Grouped by day
+            'analysis': {
+                'dominant_industry': dominant_industry,
+                'template_category': template_category,
+                'lead_count': len(leads),
+                'seniority': 'Senior/Executive' if has_senior_titles else 'Mid-level/Manager',
+                'total_options': len(emails)
+            }
+        })
+
+    except Exception as e:
+        print(f"Error generating sequence: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@app.route('/api/campaigns/send-test-email', methods=['POST'])
+def send_test_email():
+    """Send a test email to verify email sending functionality"""
+    try:
+        data = request.json
+        recipient_email = data.get('recipient_email')
+        template_id = data.get('template_id')
+        template_data = data.get('template_data')
+        sender_id = data.get('sender_id')
+        test_lead_name = data.get('test_lead_name', 'Test User')
+        test_company = data.get('test_company', 'Test Company')
+
+        if not recipient_email:
+            return jsonify({'success': False, 'error': 'Recipient email is required'}), 400
+
+        if not sender_id:
+            return jsonify({'success': False, 'error': 'Sender account is required'}), 400
+
+        # Get sender account
+        sender = SenderAccount.query.get(sender_id)
+        if not sender:
+            return jsonify({'success': False, 'error': 'Sender account not found'}), 404
+
+        if sender.status != 'connected':
+            return jsonify({'success': False, 'error': 'Sender account is not connected. Please reconnect.'}), 400
+
+        # Get email content
+        if template_id and template_id > 0:
+            # Load from database template
+            template = EmailTemplate.query.get(template_id)
+            if not template:
+                return jsonify({'success': False, 'error': 'Template not found'}), 404
+            subject = template.subject_template
+            body = template.body_template
+        elif template_data:
+            # Use AI-generated template data
+            subject = template_data.get('subject', 'Test Email')
+            body = template_data.get('body', 'This is a test email.')
+        else:
+            return jsonify({'success': False, 'error': 'Template data is required'}), 400
+
+        # Replace variables with test data
+        replacements = {
+            '{{FirstName}}': test_lead_name,
+            '{{CompanyName}}': test_company,
+            '{{SenderName}}': sender.email.split('@')[0].title(),
+            '{{Title}}': 'Test Title',
+            '{{Industry}}': 'Technology',
+            '{{Email}}': recipient_email
+        }
+
+        for key, value in replacements.items():
+            subject = subject.replace(key, value)
+            body = body.replace(key, value)
+
+        # Convert body to professional HTML format
+        html_body = text_to_html_email(body)
+
+        # Send email using Gmail API
+        try:
+            from google.oauth2.credentials import Credentials
+            from googleapiclient.discovery import build
+            from email.mime.text import MIMEText
+            import base64
+
+            # Refresh token if needed
+            if sender.token_expiry and sender.token_expiry < datetime.utcnow():
+                # Token refresh logic would go here
+                pass
+
+            # Build credentials
+            creds = Credentials(
+                token=sender.access_token,
+                refresh_token=sender.refresh_token,
+                token_uri='https://oauth2.googleapis.com/token',
+                client_id=os.getenv('GOOGLE_OAUTH_CLIENT_ID'),
+                client_secret=os.getenv('GOOGLE_OAUTH_CLIENT_SECRET')
+            )
+
+            # Create Gmail API service
+            service = build('gmail', 'v1', credentials=creds)
+
+            # Create HTML message
+            message = MIMEText(html_body, 'html')
+            message['to'] = recipient_email
+            message['from'] = sender.email
+            message['subject'] = f"[TEST] {subject}"
+
+            # Encode message
+            raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
+            send_message = {'raw': raw}
+
+            # Send via Gmail API
+            result = service.users().messages().send(userId='me', body=send_message).execute()
+
+            return jsonify({
+                'success': True,
+                'message': f'Test email sent successfully to {recipient_email}',
+                'message_id': result.get('id')
+            })
+
+        except Exception as e:
+            print(f"Error sending email via Gmail API: {e}")
+            import traceback
+            traceback.print_exc()
+            return jsonify({
+                'success': False,
+                'error': f'Failed to send email: {str(e)}'
+            }), 500
+
+    except Exception as e:
+        print(f"Error in send_test_email: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/campaigns/personalize-email', methods=['POST'])
+def personalize_email():
+    """AI-powered email personalization - adjusts template to match lead characteristics"""
+    try:
+        data = request.json
+        template_subject = data.get('subject', '')
+        template_body = data.get('body', '')
+        leads = data.get('leads', [])
+        mode = data.get('mode', 'individual')  # 'individual' or 'batch'
+
+        if not template_subject or not template_body:
+            return jsonify({'success': False, 'error': 'Template subject and body are required'}), 400
+
+        if not leads or len(leads) == 0:
+            return jsonify({'success': False, 'error': 'At least one lead is required for personalization'}), 400
+
+        try:
+            import google.generativeai as genai
+        except ImportError:
+            return jsonify({'success': False, 'error': 'Google Generative AI package not installed'}), 500
+
+        gemini_keys = [k for k in [
+            os.getenv('GEMINI_API_KEY'),
+            os.getenv('GEMINI_API_KEY_FALLBACK')
+        ] if k]
+        if not gemini_keys:
+            return jsonify({'success': False, 'error': 'Gemini API key not configured. Add GEMINI_API_KEY to .env'}), 500
+
+        # Analyze lead characteristics
+        industries = list(set([l.get('company', 'Unknown') for l in leads[:20]]))
+        titles = list(set([l.get('title', 'Professional') for l in leads[:20]]))
+        companies = list(set([l.get('company', '') for l in leads[:20] if l.get('company')]))
+
+        lead_summary = f"""
+Lead Analysis ({len(leads)} total leads):
+- Companies: {', '.join(companies[:10])}
+- Job Titles: {', '.join(titles[:10])}
+- Total contacts: {len(leads)}
+"""
+
+        prompt = f"""You are an expert cold email copywriter for tech recruiting/staffing.
+
+TASK: Personalize this email template to better match the target audience described below.
+
+ORIGINAL EMAIL:
+Subject: {template_subject}
+Body:
+{template_body}
+
+TARGET AUDIENCE:
+{lead_summary}
+
+RULES:
+1. Keep the email 60-100 words MAX
+2. Keep the same template variables ({{{{FirstName}}}}, {{{{CompanyName}}}}, {{{{SenderName}}}}, etc.) - do NOT replace them
+3. Adjust the TONE and PAIN POINTS to match the audience's industry and roles
+4. Avoid spam triggers: "free", "guarantee", "100%", ALL CAPS, exclamation marks
+5. Keep subject line under 50 characters
+6. Use conversational tone, not corporate
+7. Short paragraphs (2-3 lines max)
+8. Reference specific pain points relevant to the audience's industries and titles
+9. Do NOT add new variables - only use the ones already in the template
+10. Make changes that improve relevance, not just rephrase for the sake of it
+
+RESPOND IN THIS EXACT JSON FORMAT (no markdown, no code blocks):
+{{
+  "personalized_subject": "the improved subject line",
+  "personalized_body": "the improved email body",
+  "changes_made": [
+    "Brief description of change 1",
+    "Brief description of change 2"
+  ],
+  "analysis": {{
+    "industries_detected": ["industry1", "industry2"],
+    "titles_detected": ["title1", "title2"],
+    "tone_adjustment": "Brief description of tone change",
+    "pain_points_targeted": ["pain point 1", "pain point 2"]
+  }}
+}}"""
+
+        import json as json_module
+        last_error = None
+        for api_key in gemini_keys:
+            try:
+                genai.configure(api_key=api_key)
+                model = genai.GenerativeModel('gemini-2.5-flash')
+                response = model.generate_content(prompt)
+                response_text = response.text.strip()
+
+                # Clean up response - remove markdown code blocks if present
+                if response_text.startswith('```'):
+                    response_text = response_text.split('\n', 1)[1] if '\n' in response_text else response_text[3:]
+                if response_text.endswith('```'):
+                    response_text = response_text[:-3]
+                if response_text.startswith('json'):
+                    response_text = response_text[4:]
+                response_text = response_text.strip()
+
+                result = json_module.loads(response_text)
+
+                return jsonify({
+                    'success': True,
+                    'original': {
+                        'subject': template_subject,
+                        'body': template_body
+                    },
+                    'personalized': {
+                        'subject': result.get('personalized_subject', template_subject),
+                        'body': result.get('personalized_body', template_body)
+                    },
+                    'changes_made': result.get('changes_made', []),
+                    'analysis': result.get('analysis', {})
+                })
+
+            except Exception as ai_error:
+                last_error = ai_error
+                error_str = str(ai_error)
+                print(f"Gemini API error with key ...{api_key[-6:]}: {error_str}")
+                if '429' in error_str or 'quota' in error_str.lower() or 'resource' in error_str.lower():
+                    print("Quota hit, trying next key...")
+                    continue
+                # Non-quota error, don't retry with next key
+                return jsonify({
+                    'success': False,
+                    'error': f'AI personalization failed: {str(ai_error)}'
+                }), 500
+
+        # All keys exhausted
+        return jsonify({
+            'success': False,
+            'error': f'AI quota exceeded on all API keys. Please try again later. Last error: {str(last_error)}'
+        }), 429
+
+    except Exception as e:
+        print(f"Error in personalize_email: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 # ==================== SENDER ACCOUNT ROUTES ====================
@@ -1998,6 +2687,10 @@ Recruitment Team''',
 
 if __name__ == '__main__':
     init_db()
+
+    # Initialize Apollo API key from environment (SECURITY)
+    with app.app_context():
+        init_apollo_api_key()
 
     # Load AI model in background
     print("Loading AI model...")

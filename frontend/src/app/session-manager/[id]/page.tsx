@@ -56,9 +56,34 @@ export default function SessionDetailPage() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    if (sessionId) {
-      loadSessionDetails()
+    if (!sessionId) return
+
+    const controller = new AbortController()
+
+    async function fetchSessionDetails() {
+      try {
+        const response = await fetch(`/api/sessions/${sessionId}`, {
+          signal: controller.signal
+        })
+        if (response.ok) {
+          const data = await response.json()
+          setSession(data.session)
+          setLeads(data.leads || [])
+        } else {
+          setError('Session not found')
+        }
+      } catch (err: any) {
+        if (err?.name === 'AbortError') return // Component unmounted, ignore
+        console.error('Error loading session:', err)
+        setError('Failed to load session details')
+      } finally {
+        setLoading(false)
+      }
     }
+
+    fetchSessionDetails()
+
+    return () => controller.abort() // Cleanup: cancel fetch if component unmounts
   }, [sessionId])
 
   const loadSessionDetails = async () => {

@@ -22,6 +22,8 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    const controller = new AbortController()
+
     async function fetchData() {
       try {
         let campaignsData: any[] = []
@@ -29,32 +31,35 @@ export default function HomePage() {
         let logsData: any[] = []
 
         try {
-          const campaignsRes = await fetch('/api/campaigns')
+          const campaignsRes = await fetch('/api/campaigns', { signal: controller.signal })
           if (campaignsRes.ok) {
             const data = await campaignsRes.json()
             campaignsData = Array.isArray(data) ? data : []
           }
-        } catch (error) {
+        } catch (error: any) {
+          if (error?.name === 'AbortError') return
           console.error('Error fetching campaigns:', error)
         }
 
         try {
-          const leadsRes = await fetch('/api/leads')
+          const leadsRes = await fetch('/api/leads', { signal: controller.signal })
           if (leadsRes.ok) {
             const data = await leadsRes.json()
             leadsData = Array.isArray(data) ? data : []
           }
-        } catch (error) {
+        } catch (error: any) {
+          if (error?.name === 'AbortError') return
           console.error('Error fetching leads:', error)
         }
 
         try {
-          const logsRes = await fetch('/api/logs')
+          const logsRes = await fetch('/api/logs', { signal: controller.signal })
           if (logsRes.ok) {
             const data = await logsRes.json()
             logsData = Array.isArray(data) ? data : []
           }
-        } catch (error) {
+        } catch (error: any) {
+          if (error?.name === 'AbortError') return
           console.error('Error fetching logs:', error)
         }
 
@@ -67,7 +72,8 @@ export default function HomePage() {
 
         setCampaigns(campaignsData)
         setLogs(logsData)
-      } catch (error) {
+      } catch (error: any) {
+        if (error?.name === 'AbortError') return
         console.error('Error fetching data:', error)
       } finally {
         setLoading(false)
@@ -75,6 +81,8 @@ export default function HomePage() {
     }
 
     fetchData()
+
+    return () => controller.abort() // Cleanup: cancel all fetches if component unmounts
   }, [])
 
   return (

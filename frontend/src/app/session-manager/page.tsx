@@ -89,7 +89,39 @@ export default function SessionManagerPage() {
   const leadCountRef = useRef(0)
 
   useEffect(() => {
-    loadSessions()
+    const controller = new AbortController()
+
+    async function fetchSessions() {
+      try {
+        const response = await fetch('/api/sessions', {
+          signal: controller.signal
+        })
+        if (response.ok) {
+          const data = await response.json()
+          if (Array.isArray(data)) {
+            setSessions(data)
+          } else if (data && Array.isArray(data.sessions)) {
+            setSessions(data.sessions)
+          } else {
+            console.warn('API returned non-array data:', data)
+            setSessions([])
+          }
+        } else {
+          console.error('Failed to load sessions:', response.status)
+          setSessions([])
+        }
+      } catch (error: any) {
+        if (error?.name === 'AbortError') return // Component unmounted, ignore
+        console.error('Error loading sessions:', error)
+        setSessions([])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchSessions()
+
+    return () => controller.abort() // Cleanup: cancel fetch if component unmounts
   }, [])
 
   const showToast = (message: string) => {
