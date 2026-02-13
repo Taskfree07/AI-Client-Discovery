@@ -1,0 +1,101 @@
+# Backend .dockerignore
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+venv/
+env/
+ENV/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Logs
+logs/*.log
+*.log
+
+# Database (will be created in container)
+*.db
+*.sqlite
+*.sqlite3
+instance/
+
+# Documentation
+*.md
+!README.md
+docs/
+
+# Frontend
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+
+# Docker
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Environment (will be passed as env vars)
+.env.local
+.env.development
+.env.test
+.env.production
+
+# Temp files
+tmp/
+temp/
+*.tmp
+
+# Windows
+Thumbs.db
+desktop.ini
+
+# Mac
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# Deployment docs
+DEPLOYMENT*.md
+deploy_check.py
