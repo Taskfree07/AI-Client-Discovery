@@ -1230,7 +1230,7 @@ function CampaignBuilderPage() {
             <div className="steps-track-bg">
               <div
                 className="steps-track-fill"
-                style={{ width: `${((currentStep - 1) / (STEPS.length - 1)) * 80}%` }}
+                style={{ width: `${((currentStep - 1) / (STEPS.length - 1)) * 100}%` }}
               ></div>
             </div>
             {STEPS.map((step, index) => (
