@@ -63,9 +63,7 @@ interface CampaignFormData {
   start_date: string
   end_date: string
   from_time: string
-  from_period: 'am' | 'pm'
   to_time: string
-  to_period: 'am' | 'pm'
   sending_days: string[]
   max_mails_per_day: number
   interval_between_mails: number
@@ -131,10 +129,8 @@ function CampaignBuilderPage() {
     ai_personalization_enabled: true,
     start_date: '',
     end_date: '',
-    from_time: '09:10',
-    from_period: 'am',
-    to_time: '12:00',
-    to_period: 'pm',
+    from_time: '09:00',
+    to_time: '17:00',
     sending_days: [],
     max_mails_per_day: 99,
     interval_between_mails: 3
@@ -1880,43 +1876,21 @@ function CampaignBuilderPage() {
                 <div className="schedule-row">
                   <div className="schedule-field">
                     <label className="schedule-label">From</label>
-                    <div className="time-input-group">
-                      <input
-                        type="text"
-                        className="time-input"
-                        placeholder="09:10"
-                        value={formData.from_time}
-                        onChange={(e) => setFormData(prev => ({ ...prev, from_time: e.target.value }))}
-                      />
-                      <select
-                        className="period-select"
-                        value={formData.from_period}
-                        onChange={(e) => setFormData(prev => ({ ...prev, from_period: e.target.value as 'am' | 'pm' }))}
-                      >
-                        <option value="am">am</option>
-                        <option value="pm">pm</option>
-                      </select>
-                    </div>
+                    <input
+                      type="time"
+                      className="schedule-input"
+                      value={formData.from_time}
+                      onChange={(e) => setFormData(prev => ({ ...prev, from_time: e.target.value }))}
+                    />
                   </div>
                   <div className="schedule-field">
                     <label className="schedule-label">To</label>
-                    <div className="time-input-group">
-                      <input
-                        type="text"
-                        className="time-input"
-                        placeholder="12:00"
-                        value={formData.to_time}
-                        onChange={(e) => setFormData(prev => ({ ...prev, to_time: e.target.value }))}
-                      />
-                      <select
-                        className="period-select"
-                        value={formData.to_period}
-                        onChange={(e) => setFormData(prev => ({ ...prev, to_period: e.target.value as 'am' | 'pm' }))}
-                      >
-                        <option value="am">am</option>
-                        <option value="pm">pm</option>
-                      </select>
-                    </div>
+                    <input
+                      type="time"
+                      className="schedule-input"
+                      value={formData.to_time}
+                      onChange={(e) => setFormData(prev => ({ ...prev, to_time: e.target.value }))}
+                    />
                   </div>
                 </div>
               </div>
@@ -2070,7 +2044,7 @@ function CampaignBuilderPage() {
                   <div className="review-item">
                     <span className="review-label">Time:</span>
                     <span className="review-value">
-                      {formData.from_time} {formData.from_period} - {formData.to_time} {formData.to_period}
+                      {formData.from_time} - {formData.to_time}
                     </span>
                   </div>
                   <div className="review-item">
