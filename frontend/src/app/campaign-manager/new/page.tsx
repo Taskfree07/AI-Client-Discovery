@@ -1236,7 +1236,7 @@ function CampaignBuilderPage() {
             {STEPS.map((step, index) => (
               <div
                 key={step.id}
-                className={`step-dot ${currentStep >= step.id ? 'active' : ''}`}
+                className={`step-dot ${currentStep > step.id ? 'completed' : ''} ${currentStep === step.id ? 'current' : ''}`}
               ></div>
             ))}
           </div>
