@@ -21,6 +21,7 @@ interface FormData {
   locations: string[]
   industries: string[]
   companySizes: string[]
+  pocRoles: string[]
 }
 
 interface Lead {
@@ -43,7 +44,7 @@ export default function SessionManagerPage() {
   const [sessions, setSessions] = useState<Session[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
-  const [activeFilter, setActiveFilter] = useState('today')
+  const [activeFilter, setActiveFilter] = useState('all')
 
   // Slide-out panel state
   const [panelOpen, setPanelOpen] = useState(false)
@@ -56,7 +57,8 @@ export default function SessionManagerPage() {
     targetLeadCount: 50,
     locations: [],
     industries: [],
-    companySizes: ['small']
+    companySizes: ['small'],
+    pocRoles: []
   })
   const [jobTitleInput, setJobTitleInput] = useState('')
   const [locationInput, setLocationInput] = useState('')
@@ -146,6 +148,8 @@ export default function SessionManagerPage() {
           return sessionDate >= monthStart
         case 'scheduled':
           return session.status === 'scheduled'
+        case 'archives':
+          return session.status === 'archived'
         case 'all':
         default:
           return true
@@ -158,21 +162,22 @@ export default function SessionManagerPage() {
   // Whether a live session exists (generating or just completed with results)
   const hasLiveSession = isGenerating || showResults
 
-  // Show current session card in date-based grids (today, week, month, all)
+  // Show current session card in date-based lists (today, week, month, all)
   const showCurrentCardInGrid = hasLiveSession && activeFilter !== 'current'
-    && (activeFilter === 'today' || activeFilter === 'week' || activeFilter === 'month' || activeFilter === 'all')
+    && activeFilter !== 'scheduled' && activeFilter !== 'archives'
 
   // Total visible items for empty state check
   const totalVisibleItems = filteredSessions.length + (showCurrentCardInGrid ? 1 : 0)
 
   // Build filter tabs - "Current Session" tab only shows when live
   const filterOptions = [
+    { id: 'all', label: 'All' },
     ...(hasLiveSession ? [{ id: 'current', label: 'Current Session' }] : []),
     { id: 'today', label: 'Today' },
-    { id: 'week', label: 'This Week' },
+    { id: 'week', label: 'This week' },
     { id: 'month', label: 'This Month' },
     { id: 'scheduled', label: 'Scheduled' },
-    { id: 'all', label: 'All' }
+    { id: 'archives', label: 'Archives' }
   ]
 
   // --- Lead Search panel logic ---
@@ -185,7 +190,8 @@ export default function SessionManagerPage() {
       targetLeadCount: 50,
       locations: [],
       industries: [],
-      companySizes: ['small']
+      companySizes: ['small'],
+      pocRoles: []
     })
     setJobTitleInput('')
     setLocationInput('')
@@ -220,6 +226,15 @@ export default function SessionManagerPage() {
       companySizes: prev.companySizes.includes(size)
         ? prev.companySizes.filter(s => s !== size)
         : [...prev.companySizes, size]
+    }))
+  }
+
+  const togglePocRole = (role: string) => {
+    setFormData(prev => ({
+      ...prev,
+      pocRoles: prev.pocRoles.includes(role)
+        ? prev.pocRoles.filter(r => r !== role)
+        : [...prev.pocRoles, role]
     }))
   }
 
@@ -270,7 +285,8 @@ export default function SessionManagerPage() {
           locations: formData.locations.length > 0 ? formData.locations : null,
           industries: formData.industries.length > 0 ? formData.industries : null,
           keywords: null,
-          company_sizes: formData.companySizes.length > 0 ? formData.companySizes : null
+          company_sizes: formData.companySizes.length > 0 ? formData.companySizes : null,
+          poc_roles: formData.pocRoles.length > 0 ? formData.pocRoles : null
         })
       })
 
@@ -402,19 +418,19 @@ export default function SessionManagerPage() {
     setShowResults(false)
     setLeads([])
     setCurrentSessionName('')
-    setActiveFilter('today')
+    setActiveFilter('all')
   }
 
   return (
     <MainLayout>
       <div className="page-header-row">
         <div className="page-header">
-          <h1 className="page-title">Session Manager</h1>
-          <p className="page-subtitle">Manage automated lead generation sessions</p>
+          <h1 className="page-title">Lead Engine</h1>
+          <p className="page-subtitle">Manage and resume your lead generation sessions</p>
         </div>
         <button className="btn-primary" onClick={openPanel} disabled={isGenerating}>
           <i className="fas fa-plus"></i>
-          New Session
+          Add New Session
         </button>
       </div>
 
@@ -430,7 +446,7 @@ export default function SessionManagerPage() {
         <input
           type="text"
           className="search-input"
-          placeholder="Search sessions by name, status, or region..."
+          placeholder="Search for campaign name"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
         />
@@ -579,18 +595,17 @@ export default function SessionManagerPage() {
           )}
         </div>
       ) : totalVisibleItems > 0 ? (
-        /* ===== DATE FILTER TABS - Sessions grid ===== */
-        <div className="sessions-grid">
-          {/* Current session as compact card in the grid */}
+        /* ===== DATE FILTER TABS - Sessions list ===== */
+        <div className="sessions-list">
+          {/* Current session as list card */}
           {showCurrentCardInGrid && (
             <div
-              className="session-card session-card-live"
+              className="session-list-card session-list-card-live"
               onClick={() => setActiveFilter('current')}
-              style={{ cursor: 'pointer' }}
             >
-              <div className="session-card-header">
-                <div className="session-card-title-row">
-                  <h3 className="session-card-title">
+              <div className="session-list-card-left">
+                <div className="session-list-card-title-row">
+                  <h3 className="session-list-card-title">
                     {isGenerating && <span className="live-dot"></span>}
                     {currentSessionName || 'Current Session'}
                   </h3>
@@ -598,69 +613,69 @@ export default function SessionManagerPage() {
                     {isGenerating ? 'Generating' : 'Complete'}
                   </span>
                 </div>
-                <span className="session-card-date">
-                  {new Date().toLocaleDateString()} - {isGenerating ? `${leads.length} leads so far` : `${leads.length} leads found`}
-                </span>
-              </div>
-
-              {/* Compact progress bar */}
-              {isGenerating && (
-                <div className="session-card-progress">
-                  <div className="session-card-progress-bar-container">
-                    <div className="session-card-progress-bar" style={{ width: `${loadingProgress}%` }}></div>
+                <div className="session-list-card-meta">
+                  <span><i className="fas fa-users"></i> {leads.length} leads</span>
+                  <span>{isGenerating ? `${loadingProgress}% complete` : 'Just now'}</span>
+                </div>
+                {isGenerating && (
+                  <div className="session-list-card-progress">
+                    <div className="session-card-progress-bar-container">
+                      <div className="session-card-progress-bar" style={{ width: `${loadingProgress}%` }}></div>
+                    </div>
                   </div>
-                  <div className="session-card-progress-text">{loadingMessage}</div>
-                </div>
-              )}
-
-              <div className="session-card-body">
-                <div className="session-stat">
-                  <span className="stat-label">Leads Found</span>
-                  <span className="stat-value">{leads.length}</span>
-                </div>
-                <div className="session-stat">
-                  <span className="stat-label">Progress</span>
-                  <span className="stat-value">{loadingProgress}%</span>
-                </div>
+                )}
               </div>
-
-              <div className="session-card-footer">
-                <span className="btn-secondary">
-                  <i className="fas fa-eye" style={{ marginRight: '6px' }}></i>View Live
+              <div className="session-list-card-actions">
+                <span className="session-list-action session-list-action-primary">
+                  <i className="fas fa-external-link-alt"></i>
+                  <span>View Live</span>
                 </span>
               </div>
             </div>
           )}
 
           {/* Saved sessions */}
-          {filteredSessions.map(session => (
-            <div key={session.id} className="session-card">
-              <div className="session-card-header">
-                <h3 className="session-card-title">{session.name}</h3>
-                <span className="session-card-date">
-                  {new Date(session.created_at).toLocaleDateString()}
-                </span>
-              </div>
-              <div className="session-card-body">
-                <div className="session-stat">
-                  <span className="stat-label">Leads Generated</span>
-                  <span className="stat-value">{session.total_leads}</span>
-                </div>
-                <div className="session-stat">
-                  <span className="stat-label">Job Titles</span>
-                  <span className="stat-value">{session.job_titles?.length || 0}</span>
-                </div>
-              </div>
-              <div className="session-card-footer">
-                <Link href={`/session-manager/${session.id}`} className="btn-secondary">
-                  View Details
+          {filteredSessions.map(session => {
+            const createdDate = new Date(session.created_at)
+            const today = new Date()
+            const isToday = createdDate.toDateString() === today.toDateString()
+            const formattedDate = createdDate.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })
+
+            return (
+              <div key={session.id} className="session-list-card">
+                <Link href={`/session-manager/${session.id}`} className="session-list-card-link">
+                  <div className="session-list-card-left">
+                    <div className="session-list-card-title-row">
+                      <h3 className="session-list-card-title">{session.name}</h3>
+                      <span className="session-list-card-date">Created on {formattedDate}</span>
+                    </div>
+                    <div className="session-list-card-meta">
+                      <span><i className="fas fa-users"></i> {session.total_leads} leads</span>
+                    </div>
+                    <div className="session-list-card-updated">
+                      {isToday ? 'Updated Today' : `Updated ${createdDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
+                    </div>
+                  </div>
                 </Link>
-                <button className="btn-outline" onClick={() => alert('Export CSV - Coming soon!')}>
-                  Export CSV
-                </button>
+                <div className="session-list-card-actions">
+                  <Link href={`/session-manager/${session.id}`} className="session-list-action session-list-action-primary">
+                    <i className="fas fa-external-link-alt"></i>
+                    <span>View Details</span>
+                  </Link>
+                  <button
+                    className="session-list-action session-list-action-secondary"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      alert('Export CSV - Coming soon!')
+                    }}
+                  >
+                    <i className="fas fa-file-export"></i>
+                    <span>Export CSV</span>
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       ) : (
         <div className="empty-state-card">
@@ -845,6 +860,72 @@ export default function SessionManagerPage() {
                   <span>Large (500+)</span>
                 </label>
               </div>
+            </div>
+          </div>
+
+          {/* POC Role Filter */}
+          <div className="panel-field" style={{ marginTop: '8px' }}>
+            <label className="panel-label">POC Role Filter</label>
+            <span className="panel-helper" style={{ marginBottom: '8px', display: 'block' }}>
+              Leave empty to use default ranking. Select roles to restrict results.
+            </span>
+            <div className="panel-checkboxes" style={{ flexDirection: 'column', gap: '6px' }}>
+              <label className="panel-checkbox">
+                <input
+                  type="checkbox"
+                  checked={formData.pocRoles.includes('talent_acquisition')}
+                  onChange={() => togglePocRole('talent_acquisition')}
+                />
+                <span>Talent Acquisition / Head of Talent</span>
+              </label>
+              <label className="panel-checkbox">
+                <input
+                  type="checkbox"
+                  checked={formData.pocRoles.includes('hr_manager')}
+                  onChange={() => togglePocRole('hr_manager')}
+                />
+                <span>HR Manager / HR Business Partner</span>
+              </label>
+              <label className="panel-checkbox">
+                <input
+                  type="checkbox"
+                  checked={formData.pocRoles.includes('engineering_manager')}
+                  onChange={() => togglePocRole('engineering_manager')}
+                />
+                <span>Engineering Manager / Hiring Manager</span>
+              </label>
+              <label className="panel-checkbox">
+                <input
+                  type="checkbox"
+                  checked={formData.pocRoles.includes('vp_engineering')}
+                  onChange={() => togglePocRole('vp_engineering')}
+                />
+                <span>VP Engineering / VP IT</span>
+              </label>
+              <label className="panel-checkbox">
+                <input
+                  type="checkbox"
+                  checked={formData.pocRoles.includes('cto')}
+                  onChange={() => togglePocRole('cto')}
+                />
+                <span>CTO / Technical Director</span>
+              </label>
+              <label className="panel-checkbox">
+                <input
+                  type="checkbox"
+                  checked={formData.pocRoles.includes('senior_recruiter')}
+                  onChange={() => togglePocRole('senior_recruiter')}
+                />
+                <span>Senior Recruiter</span>
+              </label>
+              <label className="panel-checkbox">
+                <input
+                  type="checkbox"
+                  checked={formData.pocRoles.includes('others')}
+                  onChange={() => togglePocRole('others')}
+                />
+                <span>Others</span>
+              </label>
             </div>
           </div>
 

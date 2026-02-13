@@ -232,9 +232,12 @@ export default function CampaignManagerPage() {
           <div className="panel-footer">
             <button
               className="panel-generate-btn"
+              disabled={!campaignName.trim()}
+              style={!campaignName.trim() ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
               onClick={() => {
+                if (!campaignName.trim()) return
                 setPanelOpen(false)
-                router.push('/campaign-manager/new')
+                router.push(`/campaign-manager/new?name=${encodeURIComponent(campaignName.trim())}`)
               }}
             >
               Start Campaign

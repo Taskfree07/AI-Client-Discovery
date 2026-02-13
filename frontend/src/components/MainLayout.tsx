@@ -9,9 +9,9 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
   return (
     <>
-      <TopNav onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)} />
+      <TopNav />
       <div className="main-wrapper">
-        <Sidebar collapsed={sidebarCollapsed} />
+        <Sidebar collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
         <div className={`content-wrapper ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
           <main className="container">{children}</main>
         </div>

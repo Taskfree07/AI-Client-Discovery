@@ -23,6 +23,17 @@ class LeadEngineService:
         'large': (501, 1000000)
     }
 
+    # Title priority for ranking POCs by hiring influence (lower = higher priority)
+    TITLE_PRIORITY = [
+        ['talent acquisition', 'head of talent'],
+        ['hr manager', 'hr business partner'],
+        ['engineering manager', 'hiring manager'],
+        ['vp engineering', 'vp it', 'vp of engineering', 'vp of it'],
+        ['cto', 'technical director', 'chief technology officer'],
+        ['senior recruiter'],
+    ]
+    MAX_POCS_PER_LEAD = 5
+
     def __init__(self):
         self.google_service = get_google_jobs_service()
         self.apollo_service = ApolloAPIService(APOLLO_API_KEY)
@@ -34,6 +45,7 @@ class LeadEngineService:
                        industries: List[str] = None,
                        keywords: List[str] = None,
                        company_sizes: List[str] = None,
+                       poc_roles: List[str] = None,
                        session_title: str = None) -> Generator[Dict, None, None]:
         """
         Generate leads from job openings
@@ -45,6 +57,7 @@ class LeadEngineService:
         print(f"Job Titles: {job_titles}")
         print(f"Target: {num_jobs} companies")
         print(f"Size Filter: {company_sizes}")
+        print(f"POC Role Filter: {poc_roles}")
         print(f"{'='*60}\n")
 
         # PHASE 1: Search job openings
@@ -145,7 +158,7 @@ class LeadEngineService:
                     domain=domain,
                     titles=None,  # Don't filter by specific titles
                     seniorities=['owner', 'founder', 'c_suite', 'partner', 'vp', 'director', 'head', 'manager'],
-                    per_page=6,
+                    per_page=15,
                     reveal_emails=False  # Don't reveal yet, we'll use bulk_match
                 )
 
@@ -156,7 +169,7 @@ class LeadEngineService:
                         domain=domain,
                         titles=None,
                         seniorities=None,  # No seniority filter
-                        per_page=6,
+                        per_page=15,
                         reveal_emails=False
                     )
 
@@ -207,6 +220,9 @@ class LeadEngineService:
                             poc['domain'] = domain
                         pocs = self.apollo_service.bulk_reveal_emails(pocs)
 
+                # Deduplicate, filter by selected roles, rank by hiring influence, pick top 5
+                ranked_pocs = self._rank_and_deduplicate_pocs(pocs, poc_roles=poc_roles)
+
                 # Build lead entry
                 website = company_data.get('website_url') or f'https://{domain}'
                 lead = {
@@ -230,7 +246,7 @@ class LeadEngineService:
                         'email_status': p.get('email_status', ''),
                         'phone': ', '.join(p.get('phone_numbers', [])) if p.get('phone_numbers') else '',
                         'linkedin_url': p.get('linkedin_url', '')
-                    } for p in pocs[:4]]  # Max 4 POCs per company
+                    } for p in ranked_pocs]
                 }
 
                 leads.append(lead)
@@ -317,6 +333,89 @@ class LeadEngineService:
         except Exception as e:
             print(f"[WARN] Google search for senior names at {company_name} failed: {e}")
             return []
+
+    # Mapping from poc_roles filter keys to TITLE_PRIORITY indices
+    ROLE_FILTER_MAP = {
+        'talent_acquisition': 0,  # Talent Acquisition / Head of Talent
+        'hr_manager': 1,          # HR Manager / HR Business Partner
+        'engineering_manager': 2,  # Engineering Manager / Hiring Manager
+        'vp_engineering': 3,       # VP Engineering / VP IT
+        'cto': 4,                  # CTO / Technical Director
+        'senior_recruiter': 5,     # Senior Recruiter
+        'others': -1,              # Any title not in TITLE_PRIORITY
+    }
+
+    def _rank_and_deduplicate_pocs(self, pocs: List[Dict], poc_roles: List[str] = None) -> List[Dict]:
+        """
+        Deduplicate, optionally filter by selected roles, rank by hiring influence.
+        1. Remove duplicate emails
+        2. Remove duplicate names
+        3. Filter by poc_roles (if any selected)
+        4. Rank by title priority
+        5. Return top MAX_POCS_PER_LEAD (5)
+        """
+        if not pocs:
+            return []
+
+        # Step 1: Remove duplicate emails
+        seen_emails = set()
+        deduped = []
+        for poc in pocs:
+            email = (poc.get('email') or '').strip().lower()
+            if email and email in seen_emails:
+                continue
+            if email:
+                seen_emails.add(email)
+            deduped.append(poc)
+
+        # Step 2: Remove duplicate names
+        seen_names = set()
+        unique = []
+        for poc in deduped:
+            name = (poc.get('name') or '').strip().lower()
+            if name and name in seen_names:
+                continue
+            if name:
+                seen_names.add(name)
+            unique.append(poc)
+
+        # Step 3: Rank by title priority
+        def get_title_rank(poc: Dict) -> int:
+            title = (poc.get('title') or '').lower()
+            for rank, keywords in enumerate(self.TITLE_PRIORITY):
+                for keyword in keywords:
+                    if keyword in title:
+                        return rank
+            return len(self.TITLE_PRIORITY)  # "Other" — lowest priority
+
+        # Step 3b: Filter by selected POC roles (before ranking/trimming)
+        if poc_roles:
+            allowed_indices = set()
+            include_others = False
+            for role_key in poc_roles:
+                idx = self.ROLE_FILTER_MAP.get(role_key)
+                if idx == -1:
+                    include_others = True
+                elif idx is not None:
+                    allowed_indices.add(idx)
+
+            filtered = []
+            for poc in unique:
+                rank = get_title_rank(poc)
+                if rank in allowed_indices:
+                    filtered.append(poc)
+                elif include_others and rank == len(self.TITLE_PRIORITY):
+                    filtered.append(poc)
+
+            print(f"[POC Role Filter] {len(unique)} after dedup → {len(filtered)} after role filter (roles: {poc_roles})")
+            unique = filtered
+
+        unique.sort(key=get_title_rank)
+
+        # Step 4: Return top N
+        result = unique[:self.MAX_POCS_PER_LEAD]
+        print(f"[POC Rank] {len(pocs)} raw → {len(deduped)} after email dedup → {len(result)} selected")
+        return result
 
     def _format_location(self, company_data: Dict) -> str:
         """Format location string from company data"""
