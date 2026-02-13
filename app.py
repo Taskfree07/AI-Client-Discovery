@@ -135,13 +135,13 @@ def init_apollo_api_key():
         if not existing:
             # Save to database
             save_setting('apollo_api_key', apollo_key_from_env)
-            print(f"✅ SECURITY: Apollo API key initialized from environment")
+            print(f"- SECURITY: Apollo API key initialized from environment")
         else:
             # Update if different
             if existing.value != apollo_key_from_env:
                 existing.value = apollo_key_from_env
                 db.session.commit()
-                print(f"✅ SECURITY: Apollo API key updated from environment")
+                print(f"- SECURITY: Apollo API key updated from environment")
 
 # ALLOWED ENDPOINTS - Only these can use Apollo API
 APOLLO_ALLOWED_ENDPOINTS = [
@@ -164,7 +164,7 @@ def validate_apollo_request():
         return False
 
     # Log the authorized request
-    print(f"✅ SECURITY: Authorized Apollo API request to: {request.path}")
+    print(f"- SECURITY: Authorized Apollo API request to: {request.path}")
     return True
 
 def get_apollo_api_key_secure():
@@ -1041,123 +1041,9 @@ def pipeline_contact():
 
     # SECURITY: Apollo API disabled - use Session Manager instead
     """
-    try:
-        data = request.json
-        domain = data.get('domain')
-        role_type = data.get('role_type', 'executive')
-        per_page = int(data.get('per_page', 10))
-        reveal_all = data.get('reveal_all', False)
-
-        # DISABLED FOR SECURITY
-        apollo_api_key = None  # get_setting('apollo_api_key')
-
-        if not apollo_api_key:
-            return jsonify({'success': False, 'message': 'Apollo API not configured'})
-
-        print(f"\n[CONTACT] Finding {role_type} decision makers for: {domain}")
-
-        apollo = ApolloAPIService(apollo_api_key)
-
-        # Find contacts using role-based search (without email reveal first to save credits)
-        contacts = apollo.find_contacts_by_role(
-            domain=domain, 
-            role_type=role_type, 
-            per_page=per_page,
-            reveal_emails=False
-        )
-
-        if not contacts:
-            return jsonify({
-                'success': False,
-                'message': f'No {role_type} contacts found'
-            })
-
-        # Format all contacts for response
-        formatted_contacts = []
-        for contact in contacts:
-            formatted_contacts.append({
-                'id': contact.get('id', ''),
-                'name': contact.get('name', 'Unknown'),
-                'first_name': contact.get('first_name', ''),
-                'last_name': contact.get('last_name', ''),
-                'title': contact.get('title', ''),
-                'role_category': contact.get('role_category', 'Other'),
-                'email': contact.get('email', ''),
-                'email_status': contact.get('email_status', ''),
-                'phone_numbers': contact.get('phone_numbers', []),
-                'linkedin': contact.get('linkedin_url', ''),
-                'twitter': contact.get('twitter_url', ''),
-                'company': contact.get('organization_name', ''),
-                'city': contact.get('city', ''),
-                'state': contact.get('state', ''),
-                'country': contact.get('country', ''),
-                'seniority': contact.get('seniority', ''),
-                'departments': contact.get('departments', []),
-                'photo_url': contact.get('photo_url', ''),
-                'email_revealed': False
-            })
-
-        # Get the primary contact (first one, usually highest ranking)
-        primary_contact = formatted_contacts[0]
-
-        print(f"[OK] Found {len(formatted_contacts)} contacts, primary: {primary_contact.get('name')} - {primary_contact.get('title')}")
-        print(f"[LOCK] Unlocking email for primary contact...")
-
-        # Reveal email for primary contact
-        enriched_contact = apollo.enrich_person(
-            person_id=primary_contact.get('id'),
-            domain=domain,  # Pass domain for guessed emails
-            reveal_emails=True
-        )
-
-        if enriched_contact:
-            if enriched_contact.get('email'):
-                primary_contact['email'] = enriched_contact.get('email')
-                primary_contact['email_status'] = enriched_contact.get('email_status', 'verified')
-                primary_contact['email_revealed'] = True
-                print(f"[OK] Email unlocked: {primary_contact['email']}")
-            else:
-                # No email from Apollo - include status and guessed emails
-                primary_contact['email_status'] = enriched_contact.get('email_status', 'unavailable')
-                primary_contact['email_status_explanation'] = enriched_contact.get('email_status_explanation', '')
-                primary_contact['guessed_emails'] = enriched_contact.get('guessed_emails', [])
-                print(f"[WARN] No email from Apollo - status: {primary_contact['email_status']}")
-                if primary_contact.get('guessed_emails'):
-                    print(f"[TIP] Suggested emails: {', '.join(primary_contact['guessed_emails'][:3])}")
-            
-            formatted_contacts[0] = primary_contact
-        
-        # If reveal_all is True, reveal emails for all contacts
-        if reveal_all and len(formatted_contacts) > 1:
-            print(f"\n[LOCK] Revealing emails for remaining {len(formatted_contacts) - 1} contacts...")
-            for i, contact in enumerate(formatted_contacts[1:], 1):
-                enriched = apollo.enrich_person(
-                    person_id=contact.get('id'),
-                    domain=domain,
-                    reveal_emails=True
-                )
-                if enriched:
-                    if enriched.get('email'):
-                        formatted_contacts[i]['email'] = enriched.get('email')
-                        formatted_contacts[i]['email_status'] = enriched.get('email_status', 'verified')
-                        formatted_contacts[i]['email_revealed'] = True
-                    else:
-                        formatted_contacts[i]['email_status'] = enriched.get('email_status', 'unavailable')
-                        formatted_contacts[i]['guessed_emails'] = enriched.get('guessed_emails', [])
-
-        return jsonify({
-            'success': True,
-            'contact': primary_contact,
-            'all_contacts': formatted_contacts,
-            'total_found': len(formatted_contacts),
-            'role_type': role_type
-        })
-
-    except Exception as e:
-        print(f"[ERROR] Error finding contact: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({'success': False, 'message': str(e)})
+    # Commented out code - Apollo API disabled for pipeline
+    # Use Session Manager for lead search functionality
+    """
 
 @app.route('/api/pipeline/reveal-email', methods=['POST'])
 def pipeline_reveal_email():
@@ -2081,17 +1967,17 @@ Reference: {ref_templates[3].subject_template}
 Structure: {ref_templates[3].body_template[:200]}...
 
 SPAM-FREE BEST PRACTICES (CRITICAL):
-✅ Keep each email 60-100 words max
-✅ Personal, conversational tone (not corporate)
-✅ AVOID spam triggers: "free", "guarantee", "100%", "risk-free", "act now"
-✅ AVOID ALL CAPS in subjects or excessive punctuation (!!!)
-✅ Use variables: {{{{FirstName}}}}, {{{{CompanyName}}}}, {{{{SenderName}}}}
-✅ Professional subject lines (under 50 characters)
-✅ Clear value in first sentence
-✅ Specific pain points for {dominant_industry} (not generic)
-✅ Soft call-to-action (no pressure)
-✅ Short paragraphs (2-3 lines max)
-✅ No heavy formatting, images, or attachments
+- Keep each email 60-100 words max
+- Personal, conversational tone (not corporate)
+- AVOID spam triggers: "free", "guarantee", "100%", "risk-free", "act now"
+- AVOID ALL CAPS in subjects or excessive punctuation (!!!)
+- Use variables: {{{{FirstName}}}}, {{{{CompanyName}}}}, {{{{SenderName}}}}
+- Professional subject lines (under 50 characters)
+- Clear value in first sentence
+- Specific pain points for {dominant_industry} (not generic)
+- Soft call-to-action (no pressure)
+- Short paragraphs (2-3 lines max)
+- No heavy formatting, images, or attachments
 
 INSTRUCTIONS:
 1. Generate MULTIPLE OPTIONS per day:
@@ -2412,12 +2298,12 @@ TARGET AUDIENCE:
 RULES:
 1. Keep the email 60-100 words MAX
 2. Keep the same template variables ({{{{FirstName}}}}, {{{{CompanyName}}}}, {{{{SenderName}}}}, etc.) - do NOT replace them
-3. Adjust the TONE and PAIN POINTS to match the audience's industry and roles
+3. Adjust the TONE and PAIN POINTS to match the audience industry and roles
 4. Avoid spam triggers: "free", "guarantee", "100%", ALL CAPS, exclamation marks
 5. Keep subject line under 50 characters
 6. Use conversational tone, not corporate
 7. Short paragraphs (2-3 lines max)
-8. Reference specific pain points relevant to the audience's industries and titles
+8. Reference specific pain points relevant to the audience industries and titles
 9. Do NOT add new variables - only use the ones already in the template
 10. Make changes that improve relevance, not just rephrase for the sake of it
 
