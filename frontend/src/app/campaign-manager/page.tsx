@@ -2,7 +2,6 @@
 
 import MainLayout from '@/components/MainLayout'
 import { useState, useEffect } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
 interface Campaign {
@@ -21,8 +20,6 @@ export default function CampaignManagerPage() {
   const [typeFilter, setTypeFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [dateFilter, setDateFilter] = useState('')
-  const [panelOpen, setPanelOpen] = useState(false)
-  const [campaignName, setCampaignName] = useState('')
 
   useEffect(() => {
     loadCampaigns()
@@ -68,7 +65,7 @@ export default function CampaignManagerPage() {
           <h1 className="page-title">Campaign Manager</h1>
           <p className="page-subtitle">Create and manage multi-channel outreach campaigns</p>
         </div>
-        <button className="btn-primary" onClick={() => { setCampaignName(''); setPanelOpen(true) }}>
+        <button className="btn-primary" onClick={() => router.push('/campaign-manager/new')}>
           <i className="fas fa-plus"></i>
           New Campaign
         </button>
@@ -195,56 +192,12 @@ export default function CampaignManagerPage() {
           <p className="empty-state-description">
             Create your first campaign to start reaching out to leads.
           </p>
-          <button className="btn-primary" onClick={() => { setCampaignName(''); setPanelOpen(true) }}>
+          <button className="btn-primary" onClick={() => router.push('/campaign-manager/new')}>
             <i className="fas fa-plus"></i>
             New Campaign
           </button>
         </div>
       )}
-      {/* Slide-out overlay */}
-      <div
-        className={`slideout-overlay ${panelOpen ? 'open' : ''}`}
-        onClick={() => setPanelOpen(false)}
-      />
-
-      {/* Slide-out Panel - New Campaign */}
-      <div className={`slideout-panel ${panelOpen ? 'open' : ''}`}>
-        <div className="slideout-panel-header">
-          <h2 className="slideout-panel-title">New Campaign</h2>
-          <button className="panel-close-text" onClick={() => setPanelOpen(false)}>
-            <i className="fas fa-times"></i>
-            <span>close</span>
-          </button>
-        </div>
-
-        <div className="slideout-panel-body">
-          <div className="panel-field">
-            <label className="panel-label">Campaign Name</label>
-            <input
-              type="text"
-              className="panel-input"
-              placeholder="Enter campaign name"
-              value={campaignName}
-              onChange={(e) => setCampaignName(e.target.value)}
-            />
-          </div>
-
-          <div className="panel-footer">
-            <button
-              className="panel-generate-btn"
-              disabled={!campaignName.trim()}
-              style={!campaignName.trim() ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
-              onClick={() => {
-                if (!campaignName.trim()) return
-                setPanelOpen(false)
-                router.push(`/campaign-manager/new?name=${encodeURIComponent(campaignName.trim())}`)
-              }}
-            >
-              Start Campaign
-            </button>
-          </div>
-        </div>
-      </div>
     </MainLayout>
   )
 }

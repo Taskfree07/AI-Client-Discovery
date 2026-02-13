@@ -80,6 +80,7 @@ const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'
 export default function CampaignBuilderPage() {
   const router = useRouter()
   const [currentStep, setCurrentStep] = useState(1)
+  const [campaignNameError, setCampaignNameError] = useState('')
   const [sessions, setSessions] = useState<Session[]>([])
   const [templates, setTemplates] = useState<Template[]>([])
   const [loadingSessions, setLoadingSessions] = useState(true)
@@ -89,6 +90,9 @@ export default function CampaignBuilderPage() {
   const [manualLead, setManualLead] = useState({ name: '', email: '', company: '', title: '' })
   const [importingSession, setImportingSession] = useState(false)
   const [showLeadEngineDrawer, setShowLeadEngineDrawer] = useState(false)
+  const [showCsvDrawer, setShowCsvDrawer] = useState(false)
+  const [uploadedCsvFiles, setUploadedCsvFiles] = useState<{ id: string; name: string; file: File }[]>([])
+  const [isDragging, setIsDragging] = useState(false)
   const [selectedSessionIds, setSelectedSessionIds] = useState<Set<number>>(new Set())
   const [drawerStep, setDrawerStep] = useState<'sessions' | 'leads'>('sessions')
   const [drawerLeads, setDrawerLeads] = useState<ValidatedLead[]>([])
@@ -178,6 +182,11 @@ export default function CampaignBuilderPage() {
   }
 
   const handleNext = () => {
+    if (!formData.campaign_name.trim()) {
+      setCampaignNameError('Campaign name is required')
+      return
+    }
+    setCampaignNameError('')
     if (currentStep < 5) {
       setCurrentStep(currentStep + 1)
     }
@@ -319,29 +328,19 @@ export default function CampaignBuilderPage() {
     }
   }
 
-  const handleCSVUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    
-    console.log('CSV file selected:', file.name)
-    
+  const processCSVFile = (file: File) => {
     const reader = new FileReader()
     reader.onload = (event) => {
       try {
         const text = event.target?.result as string
-        console.log('CSV content loaded, length:', text.length)
-        
         const lines = text.split(/\r?\n/).filter(l => l.trim())
-        console.log('CSV lines:', lines.length)
-        
+
         if (lines.length < 2) {
           alert('CSV file must have at least a header row and one data row')
           return
         }
-        
+
         const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase())
-        console.log('CSV headers:', headers)
-        
         const colMap = {
           name: headers.findIndex(h => h.includes('name') && !h.includes('company')),
           email: headers.findIndex(h => h.includes('email')),
@@ -349,19 +348,18 @@ export default function CampaignBuilderPage() {
           title: headers.findIndex(h => h.includes('title')),
           jobOpening: headers.findIndex(h => h.includes('job'))
         }
-        console.log('Column mapping:', colMap)
-        
+
         if (colMap.email < 0) {
           alert('CSV file must have an "email" column')
           return
         }
-        
+
         const newLeads: AddedLead[] = []
         for (let i = 1; i < lines.length; i++) {
           const cols = parseCSVLine(lines[i])
           const email = colMap.email >= 0 ? cols[colMap.email]?.trim() : ''
           if (!email) continue
-          
+
           newLeads.push({
             id: `csv-${Date.now()}-${i}`,
             name: colMap.name >= 0 ? (cols[colMap.name]?.trim() || '') : '',
@@ -372,15 +370,12 @@ export default function CampaignBuilderPage() {
             source: 'csv'
           })
         }
-        
-        console.log('Parsed leads:', newLeads.length)
-        
+
         if (newLeads.length === 0) {
           alert('No valid leads found in CSV file. Make sure the email column is not empty.')
           return
         }
-        
-        // Deduplicate within the CSV file first
+
         const uniqueNewLeads: AddedLead[] = []
         const seenEmails = new Set<string>()
         newLeads.forEach(lead => {
@@ -390,20 +385,14 @@ export default function CampaignBuilderPage() {
             uniqueNewLeads.push(lead)
           }
         })
-        
-        console.log('Unique leads after deduplication:', uniqueNewLeads.length)
-        
-        // Then deduplicate against existing leads
+
         setAddedLeads(prev => {
           const existingEmails = new Set(prev.map(l => l.email.toLowerCase()))
           const deduped = uniqueNewLeads.filter(l => !existingEmails.has(l.email.toLowerCase()))
-          console.log('Leads to add (after removing existing):', deduped.length)
-          
           if (deduped.length === 0) {
             alert('All leads from CSV already exist in the campaign')
             return prev
           }
-          
           alert(`Successfully added ${deduped.length} leads from CSV`)
           return [...prev, ...deduped]
         })
@@ -412,15 +401,54 @@ export default function CampaignBuilderPage() {
         alert('Error parsing CSV file. Please check the file format.')
       }
     }
-    
-    reader.onerror = () => {
-      console.error('Error reading file')
-      alert('Error reading CSV file')
-    }
-    
+    reader.onerror = () => alert('Error reading CSV file')
     reader.readAsText(file)
+  }
+
+  const handleCSVUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    processCSVFile(file)
     e.target.value = ''
   }
+
+  // CSV Drawer handlers
+  const handleCsvDrawerFileSelect = (files: FileList | null) => {
+    if (!files) return
+    const newFiles = Array.from(files)
+      .filter(f => f.name.endsWith('.csv') || f.name.endsWith('.xlsx') || f.name.endsWith('.txt'))
+      .map(f => ({ id: `file-${Date.now()}-${Math.random().toString(36).slice(2)}`, name: f.name, file: f }))
+    if (newFiles.length === 0) {
+      alert('Please select CSV, TXT, or XLSX files only.')
+      return
+    }
+    setUploadedCsvFiles(prev => [...prev, ...newFiles])
+  }
+
+  const removeCsvFile = (fileId: string) => {
+    setUploadedCsvFiles(prev => prev.filter(f => f.id !== fileId))
+  }
+
+  const handleCsvDrawerNext = () => {
+    uploadedCsvFiles.forEach(entry => processCSVFile(entry.file))
+    setUploadedCsvFiles([])
+    setShowCsvDrawer(false)
+  }
+
+  const closeCsvDrawer = () => {
+    setShowCsvDrawer(false)
+    setUploadedCsvFiles([])
+    setIsDragging(false)
+  }
+
+  // ESC key handler for CSV drawer
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && showCsvDrawer) closeCsvDrawer()
+    }
+    document.addEventListener('keydown', handleEsc)
+    return () => document.removeEventListener('keydown', handleEsc)
+  }, [showCsvDrawer])
 
   const handleAddLeadsFromSessions = async () => {
     if (selectedSessionIds.size === 0) return
@@ -682,41 +710,49 @@ export default function CampaignBuilderPage() {
           </div>
         </div>
 
-        {/* Campaign Name */}
-        <div className="campaign-name-section">
-          <label className="form-label">Campaign Name</label>
+        {/* Campaign Name Field */}
+        <div className="campaign-name-field">
+          <label className="campaign-name-label">
+            Campaign Name <span style={{ color: '#ef4444' }}>*</span>
+          </label>
           <input
             type="text"
-            className="form-input"
+            className={`campaign-name-input ${campaignNameError ? 'input-error' : ''}`}
             placeholder="Enter The Campaign Name Here"
             value={formData.campaign_name}
-            onChange={(e) => setFormData(prev => ({ ...prev, campaign_name: e.target.value }))}
+            onChange={(e) => {
+              setFormData(prev => ({ ...prev, campaign_name: e.target.value }))
+              if (campaignNameError) setCampaignNameError('')
+            }}
           />
+          {campaignNameError && (
+            <span className="campaign-name-error">{campaignNameError}</span>
+          )}
         </div>
 
         {/* Steps Progress */}
         <div className="steps-container">
-          <div className="steps-header">
-            {STEPS.map((step, index) => (
-              <div 
-                key={step.id} 
-                className={`step-item ${currentStep >= step.id ? 'active' : ''} ${currentStep === step.id ? 'current' : ''}`}
+          <div className="steps-labels">
+            {STEPS.map((step) => (
+              <div
+                key={step.id}
+                className={`step-label-item ${currentStep >= step.id ? 'active' : ''} ${currentStep === step.id ? 'current' : ''}`}
                 onClick={() => setCurrentStep(step.id)}
               >
                 <span className="step-name">{step.name}</span>
               </div>
             ))}
           </div>
-          <div className="steps-progress-bar">
-            <div 
-              className="steps-progress-fill" 
-              style={{ width: `${((currentStep - 1) / (STEPS.length - 1)) * 100}%` }}
+          <div className="steps-dots-row">
+            <div className="steps-track-bg"></div>
+            <div
+              className="steps-track-fill"
+              style={{ width: `${((currentStep - 1) / (STEPS.length - 1)) * 80}%` }}
             ></div>
-            {STEPS.map((step, index) => (
-              <div 
+            {STEPS.map((step) => (
+              <div
                 key={step.id}
                 className={`step-dot ${currentStep >= step.id ? 'active' : ''}`}
-                style={{ left: `${(index / (STEPS.length - 1)) * 100}%` }}
               ></div>
             ))}
           </div>
@@ -730,7 +766,7 @@ export default function CampaignBuilderPage() {
               <h2 className="step-title">Add Leads</h2>
               <div className="leads-options">
                 {/* CSV Upload Card */}
-                <div className="lead-option-card">
+                <div className="lead-option-card" onClick={() => setShowCsvDrawer(true)} style={{ cursor: 'pointer' }}>
                   <div className="lead-option-icon blue">
                     <i className="fas fa-upload"></i>
                   </div>
@@ -738,11 +774,13 @@ export default function CampaignBuilderPage() {
                   <p className="lead-option-desc">
                     Upload a CSV file containing your leads. Make sure it includes email, name, and company details.
                   </p>
-                  <label className="lead-option-import-btn">
+                  <button
+                    className="lead-option-import-btn"
+                    onClick={(e) => { e.stopPropagation(); setShowCsvDrawer(true) }}
+                  >
                     <i className="fas fa-folder-open"></i>
                     Choose File
-                    <input type="file" accept=".csv" hidden onChange={handleCSVUpload} />
-                  </label>
+                  </button>
                 </div>
 
                 {/* Lead Engine Import Card */}
@@ -1271,6 +1309,96 @@ export default function CampaignBuilderPage() {
           </div>
         </div>
       </div>
+
+      {/* CSV Upload Drawer */}
+      {showCsvDrawer && (
+        <div className="le-drawer-overlay" onClick={closeCsvDrawer}>
+          <div className="csv-drawer" onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div className="le-drawer-header">
+              <div className="le-drawer-header-left">
+                <i className="fas fa-pencil-alt le-drawer-edit-icon"></i>
+              </div>
+              <button className="le-drawer-close" onClick={closeCsvDrawer}>
+                <i className="fas fa-times"></i>
+                Close
+              </button>
+            </div>
+
+            {/* Breadcrumb */}
+            <div className="le-drawer-breadcrumb">
+              <span className="le-drawer-breadcrumb-parent">Add leads</span>
+              <i className="fas fa-chevron-right le-drawer-breadcrumb-sep"></i>
+              <span className="le-drawer-breadcrumb-current">Upload File</span>
+            </div>
+
+            {/* Body */}
+            <div className="le-drawer-body csv-drawer-body">
+              {/* Drag & Drop Zone */}
+              <div
+                className={`csv-dropzone ${isDragging ? 'dragging' : ''}`}
+                onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  setIsDragging(false)
+                  handleCsvDrawerFileSelect(e.dataTransfer.files)
+                }}
+              >
+                <p className="csv-dropzone-title">Drag and Drop</p>
+                <p className="csv-dropzone-subtitle">Max file size: 200 MB (CSV, TXT), 50 MB (XLSX)</p>
+                <label className="csv-dropzone-upload-btn">
+                  Upload
+                  <input
+                    type="file"
+                    accept=".csv,.xlsx,.txt"
+                    multiple
+                    hidden
+                    onChange={(e) => {
+                      handleCsvDrawerFileSelect(e.target.files)
+                      e.target.value = ''
+                    }}
+                  />
+                </label>
+              </div>
+
+              {/* Uploaded Files List */}
+              {uploadedCsvFiles.length > 0 && (
+                <div className="csv-uploaded-section">
+                  <h4 className="csv-uploaded-title">Uploaded Files</h4>
+                  <div className="csv-uploaded-list">
+                    {uploadedCsvFiles.map(entry => (
+                      <div key={entry.id} className="csv-uploaded-item">
+                        <div className="csv-uploaded-item-left">
+                          <i className="fas fa-file-csv csv-uploaded-icon"></i>
+                          <span className="csv-uploaded-name">{entry.name}</span>
+                        </div>
+                        <button className="csv-uploaded-remove" onClick={() => removeCsvFile(entry.id)}>
+                          <i className="fas fa-times"></i>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="le-drawer-footer">
+              <button className="le-drawer-back-btn" onClick={closeCsvDrawer}>
+                Cancel
+              </button>
+              <button
+                className="le-drawer-next-btn"
+                disabled={uploadedCsvFiles.length === 0}
+                onClick={handleCsvDrawerNext}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Lead Engine Drawer */}
       {showLeadEngineDrawer && (

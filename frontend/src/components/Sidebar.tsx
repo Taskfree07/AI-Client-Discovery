@@ -6,9 +6,10 @@ import { useState, useEffect } from 'react'
 
 interface SidebarProps {
   collapsed?: boolean
+  onToggle?: () => void
 }
 
-export default function Sidebar({ collapsed = false }: SidebarProps) {
+export default function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
   const pathname = usePathname()
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
   const [mounted, setMounted] = useState(false)
@@ -49,6 +50,16 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
 
   return (
     <aside className={`sidebar ${collapsed ? 'collapsed' : ''}`}>
+      <div className="sidebar-header">
+        <button className="sidebar-header-btn" onClick={onToggle} title="Toggle sidebar">
+          <i className="fas fa-bars"></i>
+        </button>
+        {!collapsed && (
+          <button className="sidebar-header-btn" onClick={onToggle} title="Collapse sidebar">
+            <i className="fas fa-chevron-left"></i>
+          </button>
+        )}
+      </div>
       <nav className="nav-menu">
         <div className="nav-item">
           <Link href="/" className={`nav-link ${isActive('/') ? 'active' : ''}`}>
